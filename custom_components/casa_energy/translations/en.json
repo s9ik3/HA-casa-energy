@@ -1,0 +1,103 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Casa Energy — New instance",
+        "description": "Give this configuration a name (useful if in the future you want to track multiple meters, e.g. Home and Office).",
+        "data": {
+          "instance_name": "Instance name"
+        }
+      },
+      "energy_sensors": {
+        "title": "Energy consumption sensors",
+        "description": "Select one or more sensors with device_class 'energy' whose monthly history you want to track.",
+        "data": {
+          "energy_sensors": "Energy sensors"
+        }
+      },
+      "tariff": {
+        "title": "Electricity tariff",
+        "description": "Enter your tariff details to calculate an estimated monthly cost. Always double-check these values against your real bill.",
+        "data": {
+          "price_per_kwh": "Energy price (per kWh)",
+          "fixed_monthly_cost": "Fixed monthly costs",
+          "extra_charges_per_kwh": "Extra fees/taxes (per kWh, optional)",
+          "vat_rate": "Tax rate (%)"
+        }
+      },
+      "power": {
+        "title": "Instant power",
+        "description": "Configure the total power sensor and alert thresholds.",
+        "data": {
+          "total_power_sensor": "Total power sensor",
+          "max_power": "Maximum meter/system power (W)",
+          "warning_threshold_pct": "Warning threshold (% of max power)",
+          "critical_threshold_pct": "Critical threshold (% of max power)"
+        }
+      },
+      "add_load": {
+        "title": "Loads to monitor ({count} added)",
+        "description": "Add an optional load (name + power sensor). Leave empty and continue to finish.",
+        "data": {
+          "name": "Load name",
+          "entity": "Power sensor",
+          "add_another": "Add another load after this one"
+        }
+      }
+    },
+    "error": {
+      "no_energy_sensors": "Select at least one energy sensor."
+    },
+    "abort": {
+      "already_configured": "This instance is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "energy_sensors": {
+        "title": "Energy consumption sensors",
+        "data": {
+          "energy_sensors": "Energy sensors"
+        }
+      },
+      "tariff": {
+        "title": "Electricity tariff",
+        "data": {
+          "price_per_kwh": "Energy price (per kWh)",
+          "fixed_monthly_cost": "Fixed monthly costs",
+          "extra_charges_per_kwh": "Extra fees/taxes (per kWh, optional)",
+          "vat_rate": "Tax rate (%)"
+        }
+      },
+      "power": {
+        "title": "Instant power",
+        "data": {
+          "total_power_sensor": "Total power sensor",
+          "max_power": "Maximum meter/system power (W)",
+          "warning_threshold_pct": "Warning threshold (% of max power)",
+          "critical_threshold_pct": "Critical threshold (% of max power)"
+        }
+      },
+      "manage_loads": {
+        "title": "Manage loads",
+        "description": "Select any loads to remove, or check 'Add more' to add new ones.",
+        "data": {
+          "remove_loads": "Remove loads",
+          "add_more": "Add more loads"
+        }
+      },
+      "add_load_option": {
+        "title": "Add load ({count} already added)",
+        "description": "Add an optional load (name + power sensor). Leave empty and continue to finish.",
+        "data": {
+          "name": "Load name",
+          "entity": "Power sensor",
+          "add_another": "Add another load after this one"
+        }
+      }
+    },
+    "error": {
+      "no_energy_sensors": "Select at least one energy sensor."
+    }
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Casa Energy — Nuova istanza",
+        "description": "Dai un nome a questa configurazione (utile se in futuro vuoi tracciare più contatori, es. Casa e Ufficio).",
+        "data": {
+          "instance_name": "Nome istanza"
+        }
+      },
+      "energy_sensors": {
+        "title": "Sensori consumo energia",
+        "description": "Seleziona uno o più sensori con device_class 'energy' di cui vuoi tenere lo storico mensile.",
+        "data": {
+          "energy_sensors": "Sensori energy"
+        }
+      },
+      "tariff": {
+        "title": "Tariffa elettrica",
+        "description": "Inserisci i dati della tua tariffa per calcolare una stima del costo mensile. Verifica sempre questi valori con la tua bolletta reale.",
+        "data": {
+          "price_per_kwh": "Prezzo energia (per kWh)",
+          "fixed_monthly_cost": "Costi fissi mensili",
+          "extra_charges_per_kwh": "Oneri/accise aggiuntivi (per kWh, opzionale)",
+          "vat_rate": "Aliquota IVA (%)"
+        }
+      },
+      "power": {
+        "title": "Potenza istantanea",
+        "description": "Configura il sensore di potenza totale e le soglie di allerta.",
+        "data": {
+          "total_power_sensor": "Sensore potenza totale",
+          "max_power": "Potenza massima contatore/impianto (W)",
+          "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
+          "critical_threshold_pct": "Soglia critica (% della potenza massima)"
+        }
+      },
+      "add_load": {
+        "title": "Carichi da monitorare ({count} aggiunti)",
+        "description": "Aggiungi un carico opzionale (nome + sensore di potenza). Lascia vuoto e continua per terminare.",
+        "data": {
+          "name": "Nome carico",
+          "entity": "Sensore potenza",
+          "add_another": "Aggiungi un altro carico dopo questo"
+        }
+      }
+    },
+    "error": {
+      "no_energy_sensors": "Seleziona almeno un sensore energy."
+    },
+    "abort": {
+      "already_configured": "Questa istanza è già configurata."
+    }
+  },
+  "options": {
+    "step": {
+      "energy_sensors": {
+        "title": "Sensori consumo energia",
+        "data": {
+          "energy_sensors": "Sensori energy"
+        }
+      },
+      "tariff": {
+        "title": "Tariffa elettrica",
+        "data": {
+          "price_per_kwh": "Prezzo energia (per kWh)",
+          "fixed_monthly_cost": "Costi fissi mensili",
+          "extra_charges_per_kwh": "Oneri/accise aggiuntivi (per kWh, opzionale)",
+          "vat_rate": "Aliquota IVA (%)"
+        }
+      },
+      "power": {
+        "title": "Potenza istantanea",
+        "data": {
+          "total_power_sensor": "Sensore potenza totale",
+          "max_power": "Potenza massima contatore/impianto (W)",
+          "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
+          "critical_threshold_pct": "Soglia critica (% della potenza massima)"
+        }
+      },
+      "manage_loads": {
+        "title": "Gestisci carichi",
+        "description": "Seleziona eventuali carichi da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi.",
+        "data": {
+          "remove_loads": "Rimuovi carichi",
+          "add_more": "Aggiungi altri carichi"
+        }
+      },
+      "add_load_option": {
+        "title": "Aggiungi carico ({count} già presenti)",
+        "description": "Aggiungi un carico opzionale (nome + sensore di potenza). Lascia vuoto e continua per terminare.",
+        "data": {
+          "name": "Nome carico",
+          "entity": "Sensore potenza",
+          "add_another": "Aggiungi un altro carico dopo questo"
+        }
+      }
+    },
+    "error": {
+      "no_energy_sensors": "Seleziona almeno un sensore energy."
+    }
+  }
+}

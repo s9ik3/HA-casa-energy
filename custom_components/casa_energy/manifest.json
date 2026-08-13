@@ -1,0 +1,12 @@
+{
+  "domain": "casa_energy",
+  "name": "Casa Energy",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/s9ik3/HA-casa-weather-card",
+  "issue_tracker": "https://github.com/s9ik3/HA-casa-weather-card/issues",
+  "codeowners": ["@s9ik3"],
+  "iot_class": "calculated",
+  "requirements": [],
+  "integration_type": "helper"
+}

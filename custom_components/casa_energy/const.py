@@ -1,0 +1,35 @@
+"""Costanti per l'integrazione Casa Energy."""
+
+DOMAIN = "casa_energy"
+
+# --- Step 1: sensori energy per lo storico ---
+CONF_ENERGY_SENSORS = "energy_sensors"
+
+# --- Step 2: tariffa ---
+CONF_PRICE_PER_KWH = "price_per_kwh"
+CONF_FIXED_MONTHLY_COST = "fixed_monthly_cost"
+CONF_EXTRA_CHARGES_PER_KWH = "extra_charges_per_kwh"
+CONF_VAT_RATE = "vat_rate"
+
+# --- Step 3: potenza istantanea ---
+CONF_TOTAL_POWER_SENSOR = "total_power_sensor"
+CONF_MAX_POWER = "max_power"
+CONF_WARNING_THRESHOLD_PCT = "warning_threshold_pct"
+CONF_CRITICAL_THRESHOLD_PCT = "critical_threshold_pct"
+
+# --- Step 4: carichi monitorati (lista dinamica) ---
+CONF_LOADS = "loads"
+CONF_LOAD_NAME = "name"
+CONF_LOAD_ENTITY = "entity"
+
+# --- Nome istanza (per supportare più config entry, es. Casa / Ufficio) ---
+CONF_INSTANCE_NAME = "instance_name"
+
+# --- Default ragionevoli, precompilati nel form ---
+DEFAULT_VAT_RATE = 22.0
+DEFAULT_WARNING_THRESHOLD_PCT = 75
+DEFAULT_CRITICAL_THRESHOLD_PCT = 90
+DEFAULT_MAX_POWER = 3300
+
+# --- Intervallo di aggiornamento del coordinator (minuti) ---
+UPDATE_INTERVAL_MINUTES = 15
