@@ -9,10 +9,6 @@ A Home Assistant integration, installable via HACS, that calculates and monitors
 
 All configuration happens through a graphical interface — no YAML to write, no SQL query to edit.
 
-## Why
-
-This integration was built as a UI-based alternative to the manual YAML templates/SQL sensors distributed in the [Casa Weather Card](https://github.com/s9ik3/HA-casa-weather-card) repository, for those who'd rather configure everything from a form instead of editing files.
-
 ## Installation
 
 ### Via HACS (custom repository)
@@ -54,7 +50,7 @@ For each configured instance, the integration creates:
 
 ## Example Lovelace card
 
-The [Casa Weather Card](https://github.com/s9ik3/HA-casa-weather-card) repository includes, in its `examples_virtual_sensors/` folder, the file `energy_summary_card_integration.yaml`: a ready-to-use card built specifically for the two entities this integration generates (only two entity IDs to replace, everything else already lives in the attributes).
+The repository includes, in the [`examples_virtual_sensors/`](examples_virtual_sensors/) folder, the file `energy_summary_card_integration.yaml`: a ready-to-use card built specifically for the two entities this integration generates (only two entity IDs to replace, everything else already lives in the attributes).
 
 ## Technical notes
 
