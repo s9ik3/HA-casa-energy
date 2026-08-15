@@ -39,6 +39,22 @@ After installing and restarting:
 
 Settings → Devices & services → Casa Energy → **Configure**. You can edit sensors, tariff, thresholds, and manage (add/remove) monitored loads at any time, without reinstalling anything.
 
+## Included Lovelace card
+
+The integration ships with a dedicated card (`Casa Energy Card`), served and **automatically registered** at install time — no file to copy, no resource to add by hand. After configuring the integration, look for it in your dashboard's "Add card" picker.
+
+The card reads directly from the two generated entities: pick `sensor.<name>_power_status` and `sensor.<name>_monthly_energy_history` from the card's visual editor (or write the YAML yourself, if you prefer):
+
+```yaml
+type: custom:casa-energy-card
+power_entity: sensor.casa_power_status
+history_entity: sensor.casa_monthly_energy_history
+```
+
+**Note**: automatic Lovelace resource registration requires your dashboard to be in "storage" mode (the default for most installations). If you use a fully YAML-configured dashboard, auto-registration may not succeed — in that case a log message tells you to add the resource manually (Settings → Dashboards → Resources → URL `/casa_energy_static/casa-energy-card.js`, type JavaScript module). The integration remains fully functional either way: only the automatic card step might need a small manual step on this kind of setup.
+
+If you configure multiple instances (e.g. Home and Office), the card is registered only once and stays available for all of them; it's removed only when the **last** instance is uninstalled.
+
 ## Entities created
 
 For each configured instance, the integration creates:
@@ -48,9 +64,9 @@ For each configured instance, the integration creates:
 | `sensor.<name>_monthly_energy_history` | State: number of months available in the history. Attribute `mesi`: array of `{mese, kwh, costo}` for each month |
 | `sensor.<name>_power_status` | State: current power in W. Attributes: `status` (`ok`/`warning`/`critical`), `percent_of_max`, `max_power`, `warning_threshold_pct`, `critical_threshold_pct`, `loads` (array of `{name, value}`) |
 
-## Example Lovelace card
+## Alternative YAML card (optional)
 
-The repository includes, in the [`examples_virtual_sensors/`](examples_virtual_sensors/) folder, the file `energy_summary_card_integration.yaml`: a ready-to-use card built specifically for the two entities this integration generates (only two entity IDs to replace, everything else already lives in the attributes).
+If you'd rather not use the auto-registered card above, the repository still includes, in the [`examples_virtual_sensors/`](examples_virtual_sensors/) folder, the file `energy_summary_card_integration.yaml`: a more elaborate card (grid of loads, expandable previous-months history) to paste by hand, requiring `button-card` and `card_mod` via HACS.
 
 ## Technical notes
 
