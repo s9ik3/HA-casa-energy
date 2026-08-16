@@ -118,9 +118,11 @@ class CasaEnergyCard extends HTMLElement {
             align-items: center;
             gap: 6px;
             font-size: 12px;
+          }
+          .cec-load-chip[draggable="true"] {
             cursor: grab;
           }
-          .cec-load-chip:active {
+          .cec-load-chip[draggable="true"]:active {
             cursor: grabbing;
           }
           .cec-drag-handle {
@@ -334,9 +336,10 @@ class CasaEnergyCard extends HTMLElement {
       }
 
       const loads = attrs.loads || [];
+      const editMode = !!this._hass.editMode;
       const chip = (l, idx, group) => `
-        <div class="cec-load-chip" draggable="true" data-name="${l.name}" data-group="${group}">
-          <span class="cec-drag-handle">⠿</span>
+        <div class="cec-load-chip" ${editMode ? 'draggable="true"' : ""} data-name="${l.name}" data-group="${group}">
+          ${editMode ? '<span class="cec-drag-handle">⠿</span>' : ""}
           <span class="cec-chip-name">${l.name}</span>
           <span style="font-weight:700;color:${color};">${
             l.value == null ? "N/A" : Math.round(l.value) + " W"
@@ -364,7 +367,7 @@ class CasaEnergyCard extends HTMLElement {
             : ""
         }
       `;
-      this._attachDragHandlers();
+      if (editMode) this._attachDragHandlers();
     }
 
     const historyState = this._hass.states[this._config.history_entity];

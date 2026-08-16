@@ -10,37 +10,33 @@
       },
       "energy_sensors": {
         "title": "Energy consumption sensors",
-        "description": "Select one or more sensors with device_class 'energy' whose monthly history you want to track.",
+        "description": "Select one or more sensors with device_class 'energy' whose monthly history you want to track. For each one, the power sensor (Watts) of the same device will be identified automatically to calculate instant power: you don't need to select it again.",
         "data": {
           "energy_sensors": "Energy sensors"
         }
       },
-      "tariff": {
-        "title": "Electricity tariff",
-        "description": "Enter your tariff details to calculate an estimated monthly cost. Always double-check these values against your real bill.",
+      "ambiguous_power": {
+        "title": "Choose the power sensor",
+        "description": "The device '{device_name}' (energy sensor: {energy_entity}) has more than one power sensor. Choose which one to use for the total calculation, and the name to display this load with.",
         "data": {
-          "price_per_kwh": "Energy price (per kWh)",
-          "fixed_monthly_cost": "Fixed monthly costs",
-          "extra_charges_per_kwh": "Extra fees/taxes (per kWh, optional)",
-          "vat_rate": "Tax rate (%)"
+          "name": "Load name",
+          "entity": "Power sensor"
+        }
+      },
+      "unmatched_power": {
+        "title": "Power sensor not found",
+        "description": "No matching power sensor (Watts) was found for these devices: {devices}. They won't be counted in the total instant power until you add a power sensor to that device. Check the box to proceed anyway accepting this limitation, or go back and review your selection.",
+        "data": {
+          "ignore_unmatched_power": "Proceed anyway (these devices won't count toward the total)"
         }
       },
       "power": {
         "title": "Instant power",
-        "description": "Configure your meter/system's maximum power and alert thresholds. Total instant power will be calculated by summing the loads you'll add in the next step.",
+        "description": "Configure your meter/system's maximum power and alert thresholds. Total instant power is calculated by summing the power sensors automatically matched to the energy sensors selected earlier.",
         "data": {
           "max_power": "Maximum meter/system power (W)",
           "warning_threshold_pct": "Warning threshold (% of max power)",
           "critical_threshold_pct": "Critical threshold (% of max power)"
-        }
-      },
-      "add_load": {
-        "title": "Loads to monitor ({count} added)",
-        "description": "Add at least one load (name + power sensor in Watts): total power will be calculated by summing all loads added here. Leave empty and continue when done.",
-        "data": {
-          "name": "Load name",
-          "entity": "Power sensor",
-          "add_another": "Add another load after this one"
         }
       },
       "add_display_load": {
@@ -55,7 +51,7 @@
     },
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
-      "no_loads": "Add at least one load: total power is calculated by summing them.",
+      "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
       "duplicate_entity": "This sensor has already been added to this list."
     },
     "abort": {
@@ -66,8 +62,24 @@
     "step": {
       "energy_sensors": {
         "title": "Energy consumption sensors",
+        "description": "The power sensor (Watts) for each device is identified automatically. If you don't change the selection, already configured loads (including any renames) stay unchanged.",
         "data": {
           "energy_sensors": "Energy sensors"
+        }
+      },
+      "ambiguous_power": {
+        "title": "Choose the power sensor",
+        "description": "The device '{device_name}' (energy sensor: {energy_entity}) has more than one power sensor. Choose which one to use for the total calculation, and the name to display this load with.",
+        "data": {
+          "name": "Load name",
+          "entity": "Power sensor"
+        }
+      },
+      "unmatched_power": {
+        "title": "Power sensor not found",
+        "description": "No matching power sensor (Watts) was found for these devices: {devices}. They won't be counted in the total instant power until you add a power sensor to that device. Check the box to proceed anyway accepting this limitation, or go back and review your selection.",
+        "data": {
+          "ignore_unmatched_power": "Proceed anyway (these devices won't count toward the total)"
         }
       },
       "tariff": {
@@ -81,28 +93,11 @@
       },
       "power": {
         "title": "Instant power",
-        "description": "Total instant power is calculated by summing the loads configured in the next step.",
+        "description": "Total instant power is calculated by summing the power sensors automatically matched to the energy sensors.",
         "data": {
           "max_power": "Maximum meter/system power (W)",
           "warning_threshold_pct": "Warning threshold (% of max power)",
           "critical_threshold_pct": "Critical threshold (% of max power)"
-        }
-      },
-      "manage_loads": {
-        "title": "Manage loads",
-        "description": "Select any loads to remove, or check 'Add more' to add new ones. At least one load must always remain.",
-        "data": {
-          "remove_loads": "Remove loads",
-          "add_more": "Add more loads"
-        }
-      },
-      "add_load_option": {
-        "title": "Add load ({count} already added)",
-        "description": "Add a load (name + power sensor). Leave empty and continue to finish.",
-        "data": {
-          "name": "Load name",
-          "entity": "Power sensor",
-          "add_another": "Add another load after this one"
         }
       },
       "manage_display_loads": {
@@ -125,7 +120,7 @@
     },
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
-      "no_loads": "At least one load must remain: total power is calculated by summing them.",
+      "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
       "duplicate_entity": "This sensor has already been added to this list."
     }
   }

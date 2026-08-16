@@ -10,37 +10,33 @@
       },
       "energy_sensors": {
         "title": "Sensori consumo energia",
-        "description": "Seleziona uno o più sensori con device_class 'energy' di cui vuoi tenere lo storico mensile.",
+        "description": "Seleziona uno o più sensori con device_class 'energy' di cui vuoi tenere lo storico mensile. Per ciascuno, il sensore di potenza (Watt) dello stesso dispositivo verrà individuato automaticamente per calcolare la potenza istantanea: non serve selezionarlo di nuovo.",
         "data": {
           "energy_sensors": "Sensori energy"
         }
       },
-      "tariff": {
-        "title": "Tariffa elettrica",
-        "description": "Inserisci i dati della tua tariffa per calcolare una stima del costo mensile. Verifica sempre questi valori con la tua bolletta reale.",
+      "ambiguous_power": {
+        "title": "Scegli il sensore di potenza",
+        "description": "Il dispositivo '{device_name}' (sensore energy: {energy_entity}) ha più sensori di potenza. Scegli quale usare per il calcolo del totale, e il nome con cui mostrare questo carico.",
         "data": {
-          "price_per_kwh": "Prezzo energia (per kWh)",
-          "fixed_monthly_cost": "Costi fissi mensili",
-          "extra_charges_per_kwh": "Oneri/accise aggiuntivi (per kWh, opzionale)",
-          "vat_rate": "Aliquota IVA (%)"
+          "name": "Nome carico",
+          "entity": "Sensore potenza"
+        }
+      },
+      "unmatched_power": {
+        "title": "Sensore di potenza non trovato",
+        "description": "Per questi dispositivi non è stato trovato un sensore di potenza (Watt) abbinato: {devices}. Non verranno conteggiati nella potenza istantanea totale finché non aggiungi un sensore power a quel dispositivo. Spunta la casella per procedere comunque accettando questo limite, oppure torna indietro e rivedi la selezione.",
+        "data": {
+          "ignore_unmatched_power": "Procedi comunque (questi dispositivi non conteranno nel totale)"
         }
       },
       "power": {
         "title": "Potenza istantanea",
-        "description": "Configura la potenza massima del tuo contatore/impianto e le soglie di allerta. La potenza istantanea totale verrà calcolata sommando i carichi che aggiungerai nel prossimo passaggio.",
+        "description": "Configura la potenza massima del tuo contatore/impianto e le soglie di allerta. La potenza istantanea totale è calcolata sommando i sensori power abbinati automaticamente ai sensori energy selezionati in precedenza.",
         "data": {
           "max_power": "Potenza massima contatore/impianto (W)",
           "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
-        }
-      },
-      "add_load": {
-        "title": "Carichi da monitorare ({count} aggiunti)",
-        "description": "Aggiungi almeno un carico (nome + sensore di potenza in Watt): la potenza totale sarà calcolata sommando tutti i carichi aggiunti qui. Lascia vuoto e continua quando hai finito.",
-        "data": {
-          "name": "Nome carico",
-          "entity": "Sensore potenza",
-          "add_another": "Aggiungi un altro carico dopo questo"
         }
       },
       "add_display_load": {
@@ -55,7 +51,7 @@
     },
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
-      "no_loads": "Aggiungi almeno un carico: la potenza totale viene calcolata sommandoli.",
+      "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
       "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista."
     },
     "abort": {
@@ -66,8 +62,24 @@
     "step": {
       "energy_sensors": {
         "title": "Sensori consumo energia",
+        "description": "Il sensore di potenza (Watt) di ogni dispositivo viene individuato automaticamente. Se non cambi la selezione, i carichi già configurati (incluse eventuali rinomine) restano invariati.",
         "data": {
           "energy_sensors": "Sensori energy"
+        }
+      },
+      "ambiguous_power": {
+        "title": "Scegli il sensore di potenza",
+        "description": "Il dispositivo '{device_name}' (sensore energy: {energy_entity}) ha più sensori di potenza. Scegli quale usare per il calcolo del totale, e il nome con cui mostrare questo carico.",
+        "data": {
+          "name": "Nome carico",
+          "entity": "Sensore potenza"
+        }
+      },
+      "unmatched_power": {
+        "title": "Sensore di potenza non trovato",
+        "description": "Per questi dispositivi non è stato trovato un sensore di potenza (Watt) abbinato: {devices}. Non verranno conteggiati nella potenza istantanea totale finché non aggiungi un sensore power a quel dispositivo. Spunta la casella per procedere comunque accettando questo limite, oppure torna indietro e rivedi la selezione.",
+        "data": {
+          "ignore_unmatched_power": "Procedi comunque (questi dispositivi non conteranno nel totale)"
         }
       },
       "tariff": {
@@ -81,28 +93,11 @@
       },
       "power": {
         "title": "Potenza istantanea",
-        "description": "La potenza istantanea totale viene calcolata sommando i carichi configurati nel passaggio successivo.",
+        "description": "La potenza istantanea totale è calcolata sommando i sensori power abbinati automaticamente ai sensori energy.",
         "data": {
           "max_power": "Potenza massima contatore/impianto (W)",
           "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
-        }
-      },
-      "manage_loads": {
-        "title": "Gestisci carichi",
-        "description": "Seleziona eventuali carichi da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi. Deve rimanere sempre almeno un carico.",
-        "data": {
-          "remove_loads": "Rimuovi carichi",
-          "add_more": "Aggiungi altri carichi"
-        }
-      },
-      "add_load_option": {
-        "title": "Aggiungi carico ({count} già presenti)",
-        "description": "Aggiungi un carico (nome + sensore di potenza). Lascia vuoto e continua per terminare.",
-        "data": {
-          "name": "Nome carico",
-          "entity": "Sensore potenza",
-          "add_another": "Aggiungi un altro carico dopo questo"
         }
       },
       "manage_display_loads": {
@@ -125,7 +120,7 @@
     },
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
-      "no_loads": "Deve rimanere almeno un carico: la potenza totale viene calcolata sommandoli.",
+      "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
       "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista."
     }
   }

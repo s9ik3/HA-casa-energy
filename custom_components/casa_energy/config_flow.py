@@ -15,7 +15,9 @@ from .const import (
     CONF_ENERGY_SENSORS,
     CONF_EXTRA_CHARGES_PER_KWH,
     CONF_FIXED_MONTHLY_COST,
+    CONF_IGNORE_UNMATCHED,
     CONF_INSTANCE_NAME,
+    CONF_LOAD_ENERGY_ENTITY,
     CONF_LOAD_ENTITY,
     CONF_LOAD_NAME,
     CONF_LOADS,
@@ -29,6 +31,7 @@ from .const import (
     DEFAULT_WARNING_THRESHOLD_PCT,
     DOMAIN,
 )
+from .device_matching import resolve_power_sensors
 
 ENERGY_SENSOR_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
@@ -38,13 +41,121 @@ POWER_SENSOR_SELECTOR = selector.EntitySelector(
 )
 
 
-class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class _DeviceMatchingMixin:
+    """Logica condivisa tra ConfigFlow e OptionsFlow per la risoluzione
+    automatica dei sensori power a partire dai sensori energy scelti
+    dall'utente. La classe che la usa deve esporre self._data, self.hass
+    e il metodo async _continue_after_loads() (implementato sia in
+    ConfigFlow che in OptionsFlow, prosegue verso lo step tariffa)."""
+
+    async def _async_resolve_devices(self) -> config_entries.ConfigFlowResult:
+        """Esegue il matching device-based e decide se proseguire, chiedere
+        di risolvere le ambiguità, o mostrare l'errore bloccante per i
+        sensori senza corrispondenza."""
+        result = resolve_power_sensors(self.hass, self._data.get(CONF_ENERGY_SENSORS, []))
+
+        self._match_matched = result.matched
+        self._match_ambiguous = list(result.ambiguous.items())
+        self._match_unmatched = result.unmatched
+
+        return await self._async_continue_matching()
+
+    async def _async_continue_matching(self) -> config_entries.ConfigFlowResult:
+        """Prosegue la risoluzione dopo un eventuale step di
+        disambiguazione: se restano ambiguità le chiede, altrimenti
+        gestisce i non risolti, altrimenti finalizza."""
+        if self._match_ambiguous:
+            return await self.async_step_ambiguous_power()
+
+        if self._match_unmatched and not self._data.get(CONF_IGNORE_UNMATCHED):
+            return await self.async_step_unmatched_power()
+
+        return await self._async_finalize_loads()
+
+    async def _async_finalize_loads(self) -> config_entries.ConfigFlowResult:
+        """Costruisce CONF_LOADS a partire dai match risolti (auto +
+        disambiguati) e prosegue verso lo step successivo del flow."""
+        loads = []
+        for energy_entity, info in self._match_matched.items():
+            loads.append(
+                {
+                    CONF_LOAD_NAME: info["name"],
+                    CONF_LOAD_ENTITY: info["power_entity"],
+                    CONF_LOAD_ENERGY_ENTITY: energy_entity,
+                }
+            )
+        self._data[CONF_LOADS] = loads
+        return await self._continue_after_loads()
+
+    # ---------- Step: disambiguazione (device con più sensori power) ----------
+    async def async_step_ambiguous_power(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            energy_entity, info = self._match_ambiguous.pop(0)
+            chosen = user_input.get(CONF_LOAD_ENTITY)
+            name = user_input.get(CONF_LOAD_NAME, "").strip() or info["name"]
+            self._match_matched[energy_entity] = {
+                "name": name,
+                "power_entity": chosen,
+            }
+            return await self._async_continue_matching()
+
+        energy_entity, info = self._match_ambiguous[0]
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_LOAD_NAME, default=info["name"]): str,
+                vol.Required(CONF_LOAD_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(include_entities=info["options"])
+                ),
+            }
+        )
+        return self.async_show_form(
+            step_id="ambiguous_power",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "energy_entity": energy_entity,
+                "device_name": info["name"],
+            },
+        )
+
+    # ---------- Step: errore bloccante per sensori senza corrispondenza ----------
+    async def async_step_unmatched_power(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if user_input.get(CONF_IGNORE_UNMATCHED):
+                self._data[CONF_IGNORE_UNMATCHED] = True
+                return await self._async_finalize_loads()
+            errors["base"] = "unmatched_power_sensors"
+
+        names = ", ".join(self._match_unmatched.values())
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_IGNORE_UNMATCHED, default=False): bool,
+            }
+        )
+        return self.async_show_form(
+            step_id="unmatched_power",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"devices": names},
+        )
+
+
+class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, domain=DOMAIN):
     """Gestisce il flow di configurazione iniziale (aggiunta integrazione)."""
 
     VERSION = 1
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._match_matched: dict[str, dict] = {}
+        self._match_ambiguous: list[tuple[str, dict]] = []
+        self._match_unmatched: dict[str, str] = {}
 
     # ---------- STEP 0: nome istanza ----------
     async def async_step_user(
@@ -62,7 +173,7 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
-    # ---------- STEP 1: sensori energy per lo storico ----------
+    # ---------- STEP 1: sensori energy (da qui deriviamo anche i carichi power) ----------
     async def async_step_energy_sensors(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
@@ -72,7 +183,7 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "no_energy_sensors"
             else:
                 self._data[CONF_ENERGY_SENSORS] = user_input[CONF_ENERGY_SENSORS]
-                return await self.async_step_tariff()
+                return await self._async_resolve_devices()
 
         schema = vol.Schema(
             {
@@ -82,6 +193,9 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="energy_sensors", data_schema=schema, errors=errors
         )
+
+    async def _continue_after_loads(self) -> config_entries.ConfigFlowResult:
+        return await self.async_step_tariff()
 
     # ---------- STEP 2: tariffa ----------
     async def async_step_tariff(
@@ -102,15 +216,15 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
 
-    # ---------- STEP 3: soglie potenza (il totale è calcolato dai carichi) ----------
+    # ---------- STEP 3: soglie potenza ----------
     async def async_step_power(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             self._data.update(user_input)
-            self._data[CONF_LOADS] = []
-            return await self.async_step_add_load()
+            self._data.setdefault(CONF_DISPLAY_LOADS, [])
+            return await self.async_step_add_display_load()
 
         schema = vol.Schema(
             {
@@ -125,47 +239,7 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="power", data_schema=schema, errors=errors)
 
-    # ---------- STEP 4: carichi monitorati (dinamico, ripetibile) ----------
-    async def async_step_add_load(
-        self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            entity = user_input.get(CONF_LOAD_ENTITY)
-            existing_entities = {l[CONF_LOAD_ENTITY] for l in self._data[CONF_LOADS]}
-            if entity and entity in existing_entities:
-                errors["base"] = "duplicate_entity"
-            elif user_input.get(CONF_LOAD_NAME) and entity:
-                self._data[CONF_LOADS].append(
-                    {
-                        CONF_LOAD_NAME: user_input[CONF_LOAD_NAME],
-                        CONF_LOAD_ENTITY: entity,
-                    }
-                )
-            if not errors and user_input.get("add_another"):
-                return await self.async_step_add_load()
-            if not errors:
-                if not self._data[CONF_LOADS]:
-                    errors["base"] = "no_loads"
-                else:
-                    self._data[CONF_DISPLAY_LOADS] = []
-                    return await self.async_step_add_display_load()
-
-        schema = vol.Schema(
-            {
-                vol.Optional(CONF_LOAD_NAME): str,
-                vol.Optional(CONF_LOAD_ENTITY): POWER_SENSOR_SELECTOR,
-                vol.Optional("add_another", default=False): bool,
-            }
-        )
-        return self.async_show_form(
-            step_id="add_load",
-            data_schema=schema,
-            errors=errors,
-            description_placeholders={"count": str(len(self._data[CONF_LOADS]))},
-        )
-
-    # ---------- STEP 5: dispositivi mostrati singolarmente (opzionale, NON entrano nel totale) ----------
+    # ---------- STEP finale: dispositivi mostrati singolarmente (opzionale, NON entrano nel totale) ----------
     async def async_step_add_display_load(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
@@ -213,7 +287,7 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return CasaEnergyOptionsFlow(config_entry)
 
 
-class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
+class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
     """Permette di modificare la configurazione dopo l'installazione,
     dal pannello Impostazioni → Dispositivi e servizi → Casa Energy → Opzioni.
     Stessa logica del config_flow iniziale, ma parte dai valori già salvati."""
@@ -221,6 +295,9 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
         self._data: dict[str, Any] = dict(config_entry.data)
+        self._match_matched: dict[str, dict] = {}
+        self._match_ambiguous: list[tuple[str, dict]] = []
+        self._match_unmatched: dict[str, str] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -235,8 +312,17 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
             if not user_input.get(CONF_ENERGY_SENSORS):
                 errors["base"] = "no_energy_sensors"
             else:
+                # Se la selezione di sensori energy non è cambiata,
+                # manteniamo i carichi già risolti/rinominati in precedenza
+                # invece di rifare da zero il matching (altrimenti ogni
+                # apertura delle Opzioni perderebbe le rinomine manuali
+                # fatte in passato su un carico ambiguo).
+                previous_sensors = set(self._data.get(CONF_ENERGY_SENSORS, []))
+                new_sensors = set(user_input[CONF_ENERGY_SENSORS])
                 self._data[CONF_ENERGY_SENSORS] = user_input[CONF_ENERGY_SENSORS]
-                return await self.async_step_tariff()
+                if new_sensors == previous_sensors:
+                    return await self.async_step_tariff()
+                return await self._async_resolve_devices()
 
         schema = vol.Schema(
             {
@@ -249,6 +335,9 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="energy_sensors", data_schema=schema, errors=errors
         )
+
+    async def _continue_after_loads(self) -> config_entries.ConfigFlowResult:
+        return await self.async_step_tariff()
 
     async def async_step_tariff(
         self, user_input: dict[str, Any] | None = None
@@ -284,7 +373,7 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._data.update(user_input)
-            return await self.async_step_manage_loads()
+            return await self.async_step_manage_display_loads()
 
         schema = vol.Schema(
             {
@@ -307,104 +396,15 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
         )
         return self.async_show_form(step_id="power", data_schema=schema, errors=errors)
 
-    async def async_step_manage_loads(
-        self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Mostra i carichi già configurati con opzione di rinomina e
-        rimozione, e permette di continuare verso l'aggiunta di nuovi
-        carichi."""
-        current_loads: list[dict] = list(self._data.get(CONF_LOADS, []))
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            remove_names = set(user_input.get("remove_loads", []))
-            updated = []
-            for i, load in enumerate(current_loads):
-                if load[CONF_LOAD_NAME] in remove_names:
-                    continue
-                new_name = user_input.get(f"rename_{i}", "").strip()
-                updated.append(
-                    {
-                        CONF_LOAD_NAME: new_name or load[CONF_LOAD_NAME],
-                        CONF_LOAD_ENTITY: load[CONF_LOAD_ENTITY],
-                    }
-                )
-            self._data[CONF_LOADS] = updated
-            if user_input.get("add_more"):
-                return await self.async_step_add_load_option()
-            if not updated:
-                errors["base"] = "no_loads"
-            else:
-                return await self.async_step_manage_display_loads()
-
-        if not current_loads:
-            # Nessun carico esistente: salta direttamente all'aggiunta
-            return await self.async_step_add_load_option()
-
-        options = [load[CONF_LOAD_NAME] for load in current_loads]
-        schema_dict: dict[Any, Any] = {}
-        for i, load in enumerate(current_loads):
-            schema_dict[vol.Optional(f"rename_{i}", default=load[CONF_LOAD_NAME])] = str
-        schema_dict[vol.Optional("remove_loads", default=[])] = selector.SelectSelector(
-            selector.SelectSelectorConfig(options=options, multiple=True, mode="list")
-        )
-        schema_dict[vol.Optional("add_more", default=False)] = bool
-        schema = vol.Schema(schema_dict)
-        return self.async_show_form(
-            step_id="manage_loads", data_schema=schema, errors=errors
-        )
-
-    async def async_step_add_load_option(
-        self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Aggiunge nuovi carichi, uno alla volta, dalle Opzioni."""
-        errors: dict[str, str] = {}
-        if CONF_LOADS not in self._data:
-            self._data[CONF_LOADS] = []
-
-        if user_input is not None:
-            entity = user_input.get(CONF_LOAD_ENTITY)
-            existing_entities = {l[CONF_LOAD_ENTITY] for l in self._data[CONF_LOADS]}
-            if entity and entity in existing_entities:
-                errors["base"] = "duplicate_entity"
-            elif user_input.get(CONF_LOAD_NAME) and entity:
-                self._data[CONF_LOADS].append(
-                    {
-                        CONF_LOAD_NAME: user_input[CONF_LOAD_NAME],
-                        CONF_LOAD_ENTITY: entity,
-                    }
-                )
-            if not errors:
-                if user_input.get("add_another"):
-                    return await self.async_step_add_load_option()
-                if not self._data[CONF_LOADS]:
-                    errors["base"] = "no_loads"
-                else:
-                    return await self.async_step_manage_display_loads()
-
-        schema = vol.Schema(
-            {
-                vol.Optional(CONF_LOAD_NAME): str,
-                vol.Optional(CONF_LOAD_ENTITY): POWER_SENSOR_SELECTOR,
-                vol.Optional("add_another", default=False): bool,
-            }
-        )
-        return self.async_show_form(
-            step_id="add_load_option",
-            data_schema=schema,
-            errors=errors,
-            description_placeholders={"count": str(len(self._data[CONF_LOADS]))},
-        )
-
+    # ---------- Dispositivi solo-visualizzazione: gestione invariata ----------
     async def async_step_manage_display_loads(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Mostra i dispositivi 'solo visualizzazione' già configurati con
         opzione di rinomina e rimozione, e permette di aggiungerne di
-        nuovi. A differenza dei carichi dello step precedente, qui la
-        lista può restare vuota: questi dispositivi non entrano nel
-        calcolo del totale, servono solo per mostrarli come chip separati
-        in card."""
+        nuovi. La lista può restare vuota: questi dispositivi non entrano
+        nel calcolo del totale, servono solo per mostrarli come chip
+        separati in card."""
         current: list[dict] = list(self._data.get(CONF_DISPLAY_LOADS, []))
 
         if user_input is not None:

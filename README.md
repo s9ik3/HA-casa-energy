@@ -28,16 +28,16 @@ Tutta la configurazione avviene da interfaccia grafica — nessun YAML da scrive
 Dopo l'installazione e il riavvio:
 
 1. Impostazioni → Dispositivi e servizi → Aggiungi integrazione → cerca **Casa Energy**
-2. Segui i 4 step guidati:
+2. Segui gli step guidati:
    - **Nome istanza**: un'etichetta per questa configurazione (utile se in futuro vuoi tracciare più contatori/case separatamente)
-   - **Sensori energy**: seleziona uno o più sensori con `device_class: energy` di cui vuoi lo storico
+   - **Sensori energy**: seleziona uno o più sensori con `device_class: energy` di cui vuoi lo storico. Il sensore di potenza (Watt) dello stesso dispositivo viene individuato **automaticamente** (stesso device Home Assistant) per calcolare la potenza istantanea: non serve selezionarlo di nuovo. Se un dispositivo ha più sensori di potenza, ti verrà chiesto quale usare; se non ne ha nessuno, un avviso bloccante te lo segnala (con possibilità di procedere comunque accettando che quel dispositivo non venga conteggiato)
    - **Tariffa**: prezzo energia (€/kWh), costi fissi mensili, eventuali oneri aggiuntivi, aliquota IVA — verifica sempre questi valori con la tua bolletta reale
-   - **Potenza istantanea**: sensore di potenza totale, potenza massima del tuo contatore/impianto, soglie di allerta (in percentuale)
-3. Facoltativo: aggiungi uno o più "carichi" da monitorare singolarmente (nome + sensore di potenza)
+   - **Potenza istantanea**: potenza massima del tuo contatore/impianto, soglie di allerta (in percentuale)
+3. Facoltativo: aggiungi uno o più dispositivi da mostrare separatamente in card (nome + sensore di potenza), esclusi dal totale — utile se un dispositivo è già incluso in un carico aggregato
 
 ## Modificare la configurazione dopo l'installazione
 
-Impostazioni → Dispositivi e servizi → Casa Energy → **Configura**. Puoi modificare sensori, tariffa, soglie e gestire (aggiungere/rimuovere) i carichi monitorati in qualsiasi momento, senza reinstallare nulla.
+Impostazioni → Dispositivi e servizi → Casa Energy → **Configura**. Puoi modificare sensori energy, tariffa, soglie e gestire (aggiungere/rimuovere) i dispositivi solo-visualizzazione in qualsiasi momento, senza reinstallare nulla. Se la selezione dei sensori energy non cambia, i carichi già risolti (incluse eventuali rinomine fatte durante la disambiguazione) restano invariati.
 
 ## Card Lovelace inclusa
 
@@ -67,6 +67,10 @@ Per ogni istanza configurata, l'integrazione crea:
 ## Card YAML alternativa (opzionale)
 
 Se preferisci non usare la card auto-registrata sopra, il repository include comunque, nella cartella [`examples_virtual_sensors/`](examples_virtual_sensors/), il file `energy_summary_card_integration.yaml`: una card più elaborata (con carichi in griglia, storico mesi precedenti espandibile) da incollare a mano, richiede `button-card` e `card_mod` via HACS.
+
+## Icona dell'integrazione
+
+L'integrazione include un'icona dedicata (`custom_components/casa_energy/brand/`), mostrata automaticamente nella pagina "Dispositivi e servizi" e nel picker di aggiunta integrazione. Richiede **Home Assistant 2026.3 o successivo**: su versioni precedenti l'icona non compare (nessun errore, solo l'icona generica), il resto dell'integrazione funziona comunque normalmente.
 
 ## Note tecniche
 

@@ -17,10 +17,16 @@ CONF_MAX_POWER = "max_power"
 CONF_WARNING_THRESHOLD_PCT = "warning_threshold_pct"
 CONF_CRITICAL_THRESHOLD_PCT = "critical_threshold_pct"
 
-# --- Step 4: carichi monitorati (lista dinamica, entrano nel calcolo totale) ---
+# --- Step 4: carichi monitorati (auto-derivati dai sensori energy, entrano nel calcolo totale) ---
 CONF_LOADS = "loads"
 CONF_LOAD_NAME = "name"
 CONF_LOAD_ENTITY = "entity"
+CONF_LOAD_ENERGY_ENTITY = "energy_entity"  # sensore energy da cui questo carico è stato derivato
+
+# --- Flag per bypassare l'errore bloccante quando un device non ha un
+# sensore power abbinato al suo sensore energy (l'utente accetta il rischio
+# che quel carico non venga conteggiato nella potenza istantanea) ---
+CONF_IGNORE_UNMATCHED = "ignore_unmatched_power"
 
 # --- Step 5: dispositivi mostrati singolarmente (lista dinamica, NON entrano nel totale) ---
 CONF_DISPLAY_LOADS = "display_loads"

@@ -28,16 +28,16 @@ All configuration happens through a graphical interface — no YAML to write, no
 After installing and restarting:
 
 1. Settings → Devices & services → Add integration → search **Casa Energy**
-2. Follow the 4 guided steps:
+2. Follow the guided steps:
    - **Instance name**: a label for this configuration (useful if you want to track multiple meters/homes separately in the future)
-   - **Energy sensors**: select one or more sensors with `device_class: energy` you want history for
+   - **Energy sensors**: select one or more sensors with `device_class: energy` you want history for. The power sensor (Watts) of the same device is identified **automatically** (same Home Assistant device) to calculate instant power: you don't need to select it again. If a device has more than one power sensor, you'll be asked which one to use; if it has none, a blocking warning flags it (with the option to proceed anyway, accepting that device won't be counted)
    - **Tariff**: energy price (currency/kWh), fixed monthly costs, any extra fees, tax rate — always double-check these against your real bill
-   - **Instant power**: total power sensor, your meter/system's maximum power, alert thresholds (as percentages)
-3. Optional: add one or more "loads" to monitor individually (name + power sensor)
+   - **Instant power**: your meter/system's maximum power, alert thresholds (as percentages)
+3. Optional: add one or more devices to show separately in the card (name + power sensor), excluded from the total — useful if a device is already included in an aggregated load
 
 ## Changing the configuration after installation
 
-Settings → Devices & services → Casa Energy → **Configure**. You can edit sensors, tariff, thresholds, and manage (add/remove) monitored loads at any time, without reinstalling anything.
+Settings → Devices & services → Casa Energy → **Configure**. You can edit energy sensors, tariff, thresholds, and manage (add/remove) display-only devices at any time, without reinstalling anything. If the energy sensor selection doesn't change, already-resolved loads (including any renames made during disambiguation) stay unchanged.
 
 ## Included Lovelace card
 
@@ -67,6 +67,10 @@ For each configured instance, the integration creates:
 ## Alternative YAML card (optional)
 
 If you'd rather not use the auto-registered card above, the repository still includes, in the [`examples_virtual_sensors/`](examples_virtual_sensors/) folder, the file `energy_summary_card_integration.yaml`: a more elaborate card (grid of loads, expandable previous-months history) to paste by hand, requiring `button-card` and `card_mod` via HACS.
+
+## Integration icon
+
+The integration ships with a dedicated icon (`custom_components/casa_energy/brand/`), shown automatically on the "Devices & services" page and in the add-integration picker. Requires **Home Assistant 2026.3 or later**: on older versions the icon simply doesn't appear (no error, just the generic icon), everything else keeps working normally.
 
 ## Technical notes
 
