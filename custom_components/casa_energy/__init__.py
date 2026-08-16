@@ -211,33 +211,50 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
         )
 
         # Aggrega per mese sommando i delta di tutti i sensori configurati.
-        # Granularità giornaliera. Il riferimento (baseline) per calcolare
-        # il delta di ogni giorno è il valore ASSOLUTO più basso mai
-        # registrato per quel sensore in tutto il periodo raccolto (non solo
-        # nel mese corrente): così anche il primissimo giorno disponibile
-        # produce un consumo sensato ("quanto consumato da quando esiste
-        # il sensore ad oggi"), invece di richiedere che sia già trascorso
-        # un giorno intero di confronto dentro lo stesso mese.
+        # Per ogni mese, il consumo è: ultimo valore osservato nel mese meno
+        # il valore osservato appena PRIMA dell'inizio del mese (o, se il
+        # sensore non esisteva ancora, il primo valore disponibile in quel
+        # mese, cioè: nessun consumo pregresso da sottrarre). Questo dà un
+        # numero corretto anche il primissimo giorno di vita del sensore,
+        # perché non dipende dal numero di punti raccolti finora.
         monthly_kwh: dict[str, float] = {}
         for sensor_id, entries in stats.items():
-            daily_points: list[tuple[str, float]] = []
+            points: list[tuple[datetime, float]] = []
             for entry_stat in entries:
                 start_ts = entry_stat.get("start")
                 total = entry_stat.get("sum")
                 if total is None or start_ts is None:
                     continue
-                month_key = datetime.fromtimestamp(start_ts).strftime("%Y-%m")
-                daily_points.append((month_key, total))
+                points.append((datetime.fromtimestamp(start_ts), total))
 
-            if not daily_points:
+            if not points:
                 continue
 
-            baseline = min(v for _, v in daily_points)
-            prev_value = baseline
-            for month_key, value in daily_points:
-                delta = max(0.0, value - prev_value)
+            points.sort(key=lambda p: p[0])
+
+            # Raggruppa i punti per mese
+            by_month: dict[str, list[tuple[datetime, float]]] = {}
+            for ts, value in points:
+                by_month.setdefault(ts.strftime("%Y-%m"), []).append((ts, value))
+
+            for month_key, month_points in by_month.items():
+                month_points.sort(key=lambda p: p[0])
+                last_value = month_points[-1][1]
+
+                # Valore di riferimento: l'ultimo punto CRONOLOGICAMENTE
+                # precedente all'inizio di questo mese, se esiste tra tutti
+                # i punti raccolti (anche di mesi precedenti). Altrimenti
+                # (il sensore non esisteva prima), usa il primo valore
+                # disponibile nel mese stesso: il consumo pregresso a quel
+                # punto è per definizione sconosciuto, quindi si parte da 0.
+                month_start_dt = month_points[0][0].replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
+                earlier = [v for ts, v in points if ts < month_start_dt]
+                baseline = earlier[-1] if earlier else month_points[0][1]
+
+                delta = max(0.0, last_value - baseline)
                 monthly_kwh[month_key] = monthly_kwh.get(month_key, 0.0) + delta
-                prev_value = value
 
         months = []
         for month_key in sorted(monthly_kwh.keys()):
