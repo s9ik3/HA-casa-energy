@@ -306,14 +306,13 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
             remaining = [
                 load for load in current_loads if load[CONF_LOAD_NAME] not in remove_names
             ]
+            self._data[CONF_LOADS] = remaining
             if user_input.get("add_more"):
-                self._data[CONF_LOADS] = remaining
                 return await self.async_step_add_load_option()
             if not remaining:
                 errors["base"] = "no_loads"
             else:
-                self._data[CONF_LOADS] = remaining
-                return self.async_create_entry(title="", data=self._data)
+                return await self.async_step_manage_display_loads()
 
         if not current_loads:
             # Nessun carico esistente: salta direttamente all'aggiunta

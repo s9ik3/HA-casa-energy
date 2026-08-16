@@ -99,6 +99,17 @@ class CasaEnergyCard extends HTMLElement {
             gap: 8px;
             margin-top: 10px;
           }
+          .cec-loads-full {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+          .cec-loads-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+          }
           .cec-load-chip {
             padding: 8px 10px;
             border-radius: 12px;
@@ -123,6 +134,45 @@ class CasaEnergyCard extends HTMLElement {
             font-size: 11px;
             opacity: 0.65;
           }
+          .cec-history {
+            margin-top: 8px;
+          }
+          .cec-history-row {
+            padding: 6px 0;
+            border-top: 1px solid rgba(127,127,127,0.1);
+          }
+          .cec-history-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+          }
+          .cec-history-month {
+            opacity: 0.65;
+          }
+          .cec-history-kwh {
+            font-weight: 700;
+          }
+          .cec-history-cost {
+            opacity: 0.6;
+            font-weight: 600;
+            margin-left: 6px;
+          }
+          .cec-history-bar-track {
+            height: 5px;
+            border-radius: 999px;
+            background: rgba(127,127,127,0.1);
+            overflow: hidden;
+            margin-top: 4px;
+          }
+          .cec-history-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: #42a5f5;
+          }
+          .cec-history-empty {
+            font-size: 11px;
+            opacity: 0.5;
+          }
         </style>
         <div class="cec-top">
           <div class="cec-title-row">
@@ -139,13 +189,17 @@ class CasaEnergyCard extends HTMLElement {
           <div class="cec-bar-fill" id="cec-bar-fill" style="width:0%;"></div>
         </div>
         <div class="cec-loads" id="cec-loads"></div>
-        <div class="cec-month-row">
-          <span style="font-size:12px;opacity:0.7;">Mese corrente</span>
+        <div class="cec-month-row" id="cec-month-row" style="cursor:pointer;">
+          <span style="font-size:12px;opacity:0.7;display:flex;align-items:center;gap:4px;">
+            <span id="cec-toggle-arrow" style="font-size:9px;transition:transform 0.2s;">▸</span>
+            Mese corrente
+          </span>
           <div style="text-align:right;">
             <div class="cec-month-kwh" id="cec-month-kwh">-- kWh</div>
             <div class="cec-month-cost" id="cec-month-cost"></div>
           </div>
         </div>
+        <div class="cec-history" id="cec-history" style="display:none;"></div>
       </ha-card>
     `;
     this._powerEl = this.shadowRoot.querySelector("#cec-power");
@@ -155,6 +209,16 @@ class CasaEnergyCard extends HTMLElement {
     this._loadsEl = this.shadowRoot.querySelector("#cec-loads");
     this._monthKwhEl = this.shadowRoot.querySelector("#cec-month-kwh");
     this._monthCostEl = this.shadowRoot.querySelector("#cec-month-cost");
+    this._historyEl = this.shadowRoot.querySelector("#cec-history");
+    this._toggleArrow = this.shadowRoot.querySelector("#cec-toggle-arrow");
+    this._historyOpen = false;
+
+    this.shadowRoot.querySelector("#cec-month-row").addEventListener("click", () => {
+      this._historyOpen = !this._historyOpen;
+      this._historyEl.style.display = this._historyOpen ? "block" : "none";
+      this._toggleArrow.style.transform = this._historyOpen ? "rotate(90deg)" : "rotate(0deg)";
+      this._renderHistory();
+    });
   }
 
   _statusColor(status) {
@@ -190,30 +254,94 @@ class CasaEnergyCard extends HTMLElement {
       }
 
       const loads = attrs.loads || [];
-      this._loadsEl.innerHTML = loads
-        .map(
-          (l) => `
-          <div class="cec-load-chip">
-            <span>${l.name}</span>
-            <span style="font-weight:700;color:${color};">${
-              l.value == null ? "N/A" : Math.round(l.value) + " W"
-            }</span>
-          </div>
-        `
-        )
-        .join("");
+      const chip = (l) => `
+        <div class="cec-load-chip">
+          <span>${l.name}</span>
+          <span style="font-weight:700;color:${color};">${
+            l.value == null ? "N/A" : Math.round(l.value) + " W"
+          }</span>
+        </div>
+      `;
+      const totalLoads = loads.filter((l) => l.included_in_total !== false);
+      const displayLoads = loads.filter((l) => l.included_in_total === false);
+
+      this._loadsEl.innerHTML = `
+        ${
+          totalLoads.length
+            ? `<div class="cec-loads-full">${totalLoads.map(chip).join("")}</div>`
+            : ""
+        }
+        ${
+          displayLoads.length
+            ? `<div class="cec-loads-grid">${displayLoads.map(chip).join("")}</div>`
+            : ""
+        }
+      `;
     }
 
     const historyState = this._hass.states[this._config.history_entity];
     if (historyState) {
       const mesi = historyState.attributes?.mesi || [];
+      this._mesi = mesi;
       const now = new Date();
       const ymCorr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const corr = mesi.find((m) => m.mese === ymCorr);
       this._monthKwhEl.textContent = corr ? `${corr.kwh.toFixed(1)} kWh` : "-- kWh";
       this._monthCostEl.textContent =
         corr && corr.costo != null ? `~ € ${corr.costo.toFixed(2)}` : "";
+      if (this._historyOpen) this._renderHistory();
     }
+  }
+
+  _monthLabel(ym) {
+    const nomi = [
+      "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+      "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+    ];
+    const [y, m] = ym.split("-");
+    return `${nomi[parseInt(m, 10) - 1]} ${y}`;
+  }
+
+  _renderHistory() {
+    if (!this._historyEl) return;
+    const mesi = this._mesi || [];
+    const now = new Date();
+    const ymCorr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    const passati = mesi
+      .filter((m) => m.mese !== ymCorr)
+      .sort((a, b) => b.mese.localeCompare(a.mese));
+
+    if (!passati.length) {
+      this._historyEl.innerHTML = `<div class="cec-history-empty">Nessun mese precedente disponibile</div>`;
+      return;
+    }
+
+    const maxKwh = Math.max(...passati.map((m) => Number(m.kwh) || 0), 0.001);
+
+    this._historyEl.innerHTML = passati
+      .map((m) => {
+        const w = Math.max(0, Math.min(100, (Number(m.kwh) / maxKwh) * 100));
+        return `
+          <div class="cec-history-row">
+            <div class="cec-history-line">
+              <span class="cec-history-month">${this._monthLabel(m.mese)}</span>
+              <span>
+                <span class="cec-history-kwh">${Number(m.kwh).toFixed(1)} kWh</span>
+                ${
+                  m.costo != null
+                    ? `<span class="cec-history-cost">~ € ${Number(m.costo).toFixed(2)}</span>`
+                    : ""
+                }
+              </span>
+            </div>
+            <div class="cec-history-bar-track">
+              <div class="cec-history-bar-fill" style="width:${w}%;"></div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
   }
 }
 

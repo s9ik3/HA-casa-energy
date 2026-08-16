@@ -205,25 +205,39 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
             start,
             None,
             set(energy_sensors),
-            "month",
+            "day",
             None,
             {"sum"},
         )
 
-        # Aggrega per mese sommando i delta di tutti i sensori configurati
+        # Aggrega per mese sommando i delta di tutti i sensori configurati.
+        # Granularità giornaliera. Il riferimento (baseline) per calcolare
+        # il delta di ogni giorno è il valore ASSOLUTO più basso mai
+        # registrato per quel sensore in tutto il periodo raccolto (non solo
+        # nel mese corrente): così anche il primissimo giorno disponibile
+        # produce un consumo sensato ("quanto consumato da quando esiste
+        # il sensore ad oggi"), invece di richiedere che sia già trascorso
+        # un giorno intero di confronto dentro lo stesso mese.
         monthly_kwh: dict[str, float] = {}
         for sensor_id, entries in stats.items():
-            prev_sum: float | None = None
+            daily_points: list[tuple[str, float]] = []
             for entry_stat in entries:
                 start_ts = entry_stat.get("start")
                 total = entry_stat.get("sum")
                 if total is None or start_ts is None:
                     continue
                 month_key = datetime.fromtimestamp(start_ts).strftime("%Y-%m")
-                if prev_sum is not None:
-                    delta = max(0.0, total - prev_sum)
-                    monthly_kwh[month_key] = monthly_kwh.get(month_key, 0.0) + delta
-                prev_sum = total
+                daily_points.append((month_key, total))
+
+            if not daily_points:
+                continue
+
+            baseline = min(v for _, v in daily_points)
+            prev_value = baseline
+            for month_key, value in daily_points:
+                delta = max(0.0, value - prev_value)
+                monthly_kwh[month_key] = monthly_kwh.get(month_key, 0.0) + delta
+                prev_value = value
 
         months = []
         for month_key in sorted(monthly_kwh.keys()):
