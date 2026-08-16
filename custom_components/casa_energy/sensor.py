@@ -16,7 +16,6 @@ from .const import (
     CONF_LOAD_NAME,
     CONF_LOADS,
     CONF_MAX_POWER,
-    CONF_TOTAL_POWER_SENSOR,
     CONF_WARNING_THRESHOLD_PCT,
     DOMAIN,
 )
@@ -27,7 +26,7 @@ async def async_setup_entry(
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [MonthlyEnergyHistorySensor(coordinator, entry)]
-    if entry.data.get(CONF_TOTAL_POWER_SENSOR):
+    if entry.data.get(CONF_LOADS):
         entities.append(PowerStatusSensor(hass, entry))
     async_add_entities(entities)
 
@@ -71,15 +70,15 @@ class MonthlyEnergyHistorySensor(CoordinatorEntity, SensorEntity):
 
 
 class PowerStatusSensor(SensorEntity):
-    """Sensore derivato che rispecchia il valore del sensore di potenza
-    totale configurato, ma aggiunge lo stato di soglia (ok/warning/critical)
-    e l'elenco dei carichi come attributi pronti per la card — così la
-    energy_summary_card.yaml può leggere tutto da un'unica entità invece
-    di dover conoscere i singoli entity_id sorgente.
+    """Somma la potenza dei carichi configurati (stessa logica del
+    template originale dell'utente: [carico1, carico2, ...] | sum),
+    e aggiunge lo stato di soglia (ok/warning/critical) e l'elenco dei
+    singoli carichi come attributi pronti per la card.
 
-    Si aggiorna in tempo reale (state_change), non tramite il coordinator
-    a 15 minuti usato per lo storico mensile, perché la potenza istantanea
-    deve riflettere il valore attuale senza ritardo.
+    Si aggiorna in tempo reale (state_change su ciascun carico), non
+    tramite il coordinator a 15 minuti usato per lo storico mensile,
+    perché la potenza istantanea deve riflettere il valore attuale
+    senza ritardo.
     """
 
     _attr_icon = "mdi:flash"
@@ -91,7 +90,6 @@ class PowerStatusSensor(SensorEntity):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self._entry = entry
-        self._source_entity = entry.data.get(CONF_TOTAL_POWER_SENSOR)
         instance_name = entry.data.get(CONF_INSTANCE_NAME, "Casa")
         self._attr_unique_id = f"{entry.entry_id}_power_status"
         self._attr_name = "Potenza istantanea"
@@ -103,10 +101,18 @@ class PowerStatusSensor(SensorEntity):
         )
         self._unsub = None
 
+    def _load_entities(self) -> list[str]:
+        return [
+            load[CONF_LOAD_ENTITY]
+            for load in self._entry.data.get(CONF_LOADS, [])
+            if load.get(CONF_LOAD_ENTITY)
+        ]
+
     async def async_added_to_hass(self) -> None:
-        if self._source_entity:
+        entities = self._load_entities()
+        if entities:
             self._unsub = async_track_state_change_event(
-                self.hass, [self._source_entity], self._handle_source_change
+                self.hass, entities, self._handle_source_change
             )
         self.async_write_ha_state()
 
@@ -118,10 +124,8 @@ class PowerStatusSensor(SensorEntity):
     def _handle_source_change(self, event) -> None:
         self.async_write_ha_state()
 
-    def _read_source_value(self) -> float | None:
-        if not self._source_entity:
-            return None
-        state = self.hass.states.get(self._source_entity)
+    def _read_entity_value(self, entity_id: str) -> float | None:
+        state = self.hass.states.get(entity_id)
         if state is None or state.state in ("unknown", "unavailable"):
             return None
         try:
@@ -129,15 +133,25 @@ class PowerStatusSensor(SensorEntity):
         except (ValueError, TypeError):
             return None
 
+    def _total_power(self) -> float | None:
+        """Somma tutti i carichi configurati, come il template originale
+        [states(carico1)|float(0), states(carico2)|float(0)] | sum.
+        Un carico senza valore leggibile conta come 0, così un singolo
+        sensore offline non azzera l'intero totale."""
+        loads = self._load_entities()
+        if not loads:
+            return None
+        return round(sum(self._read_entity_value(e) or 0.0 for e in loads), 2)
+
     @property
     def native_value(self):
-        value = self._read_source_value()
+        value = self._total_power()
         return round(value) if value is not None else None
 
     @property
     def extra_state_attributes(self):
         data = self._entry.data
-        value = self._read_source_value()
+        value = self._total_power()
         max_power = float(data.get(CONF_MAX_POWER) or 0) or None
         warning_pct = data.get(CONF_WARNING_THRESHOLD_PCT)
         critical_pct = data.get(CONF_CRITICAL_THRESHOLD_PCT)
@@ -155,13 +169,7 @@ class PowerStatusSensor(SensorEntity):
 
         loads = []
         for load in data.get(CONF_LOADS, []):
-            load_state = self.hass.states.get(load[CONF_LOAD_ENTITY])
-            load_value = None
-            if load_state and load_state.state not in ("unknown", "unavailable"):
-                try:
-                    load_value = float(str(load_state.state).replace(",", "."))
-                except (ValueError, TypeError):
-                    load_value = None
+            load_value = self._read_entity_value(load[CONF_LOAD_ENTITY])
             loads.append({"name": load[CONF_LOAD_NAME], "value": load_value})
 
         return {

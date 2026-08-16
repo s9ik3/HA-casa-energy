@@ -1,7 +1,7 @@
 {
   "domain": "casa_energy",
   "name": "Casa Energy",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "config_flow": true,
   "documentation": "https://github.com/s9ik3/HA-casa-weather-card",
   "issue_tracker": "https://github.com/s9ik3/HA-casa-weather-card/issues",

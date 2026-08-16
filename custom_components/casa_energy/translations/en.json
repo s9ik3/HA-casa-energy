@@ -27,9 +27,8 @@
       },
       "power": {
         "title": "Instant power",
-        "description": "Configure the total power sensor and alert thresholds.",
+        "description": "Configure your meter/system's maximum power and alert thresholds. Total instant power will be calculated by summing the loads you'll add in the next step.",
         "data": {
-          "total_power_sensor": "Total power sensor",
           "max_power": "Maximum meter/system power (W)",
           "warning_threshold_pct": "Warning threshold (% of max power)",
           "critical_threshold_pct": "Critical threshold (% of max power)"
@@ -37,7 +36,7 @@
       },
       "add_load": {
         "title": "Loads to monitor ({count} added)",
-        "description": "Add an optional load (name + power sensor). Leave empty and continue to finish.",
+        "description": "Add at least one load (name + power sensor in Watts): total power will be calculated by summing all loads added here. Leave empty and continue when done.",
         "data": {
           "name": "Load name",
           "entity": "Power sensor",
@@ -46,7 +45,8 @@
       }
     },
     "error": {
-      "no_energy_sensors": "Select at least one energy sensor."
+      "no_energy_sensors": "Select at least one energy sensor.",
+      "no_loads": "Add at least one load: total power is calculated by summing them."
     },
     "abort": {
       "already_configured": "This instance is already configured."
@@ -71,8 +71,8 @@
       },
       "power": {
         "title": "Instant power",
+        "description": "Total instant power is calculated by summing the loads configured in the next step.",
         "data": {
-          "total_power_sensor": "Total power sensor",
           "max_power": "Maximum meter/system power (W)",
           "warning_threshold_pct": "Warning threshold (% of max power)",
           "critical_threshold_pct": "Critical threshold (% of max power)"
@@ -80,7 +80,7 @@
       },
       "manage_loads": {
         "title": "Manage loads",
-        "description": "Select any loads to remove, or check 'Add more' to add new ones.",
+        "description": "Select any loads to remove, or check 'Add more' to add new ones. At least one load must always remain.",
         "data": {
           "remove_loads": "Remove loads",
           "add_more": "Add more loads"
@@ -88,7 +88,7 @@
       },
       "add_load_option": {
         "title": "Add load ({count} already added)",
-        "description": "Add an optional load (name + power sensor). Leave empty and continue to finish.",
+        "description": "Add a load (name + power sensor). Leave empty and continue to finish.",
         "data": {
           "name": "Load name",
           "entity": "Power sensor",
@@ -97,7 +97,8 @@
       }
     },
     "error": {
-      "no_energy_sensors": "Select at least one energy sensor."
+      "no_energy_sensors": "Select at least one energy sensor.",
+      "no_loads": "At least one load must remain: total power is calculated by summing them."
     }
   }
 }

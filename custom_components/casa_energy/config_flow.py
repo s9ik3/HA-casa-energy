@@ -20,7 +20,6 @@ from .const import (
     CONF_LOADS,
     CONF_MAX_POWER,
     CONF_PRICE_PER_KWH,
-    CONF_TOTAL_POWER_SENSOR,
     CONF_VAT_RATE,
     CONF_WARNING_THRESHOLD_PCT,
     DEFAULT_CRITICAL_THRESHOLD_PCT,
@@ -35,9 +34,6 @@ ENERGY_SENSOR_SELECTOR = selector.EntitySelector(
 )
 POWER_SENSOR_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="power")
-)
-ANY_SENSOR_SELECTOR = selector.EntitySelector(
-    selector.EntitySelectorConfig(domain="sensor")
 )
 
 
@@ -105,7 +101,7 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
 
-    # ---------- STEP 3: potenza istantanea + soglie ----------
+    # ---------- STEP 3: soglie potenza (il totale è calcolato dai carichi) ----------
     async def async_step_power(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
@@ -117,7 +113,6 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_TOTAL_POWER_SENSOR): ANY_SENSOR_SELECTOR,
                 vol.Required(CONF_MAX_POWER, default=DEFAULT_MAX_POWER): vol.Coerce(int),
                 vol.Required(
                     CONF_WARNING_THRESHOLD_PCT, default=DEFAULT_WARNING_THRESHOLD_PCT
@@ -144,9 +139,12 @@ class CasaEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             if user_input.get("add_another"):
                 return await self.async_step_add_load()
-            return self.async_create_entry(
-                title=self._data[CONF_INSTANCE_NAME], data=self._data
-            )
+            if not self._data[CONF_LOADS]:
+                errors["base"] = "no_loads"
+            else:
+                return self.async_create_entry(
+                    title=self._data[CONF_INSTANCE_NAME], data=self._data
+                )
 
         schema = vol.Schema(
             {
@@ -246,10 +244,6 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Required(
-                    CONF_TOTAL_POWER_SENSOR,
-                    default=self._data.get(CONF_TOTAL_POWER_SENSOR),
-                ): ANY_SENSOR_SELECTOR,
-                vol.Required(
                     CONF_MAX_POWER, default=self._data.get(CONF_MAX_POWER, DEFAULT_MAX_POWER)
                 ): vol.Coerce(int),
                 vol.Required(
@@ -274,15 +268,21 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
         """Mostra i carichi già configurati con opzione di rimozione, e
         permette di continuare verso l'aggiunta di nuovi carichi."""
         current_loads: list[dict] = list(self._data.get(CONF_LOADS, []))
+        errors: dict[str, str] = {}
 
         if user_input is not None:
             remove_names = set(user_input.get("remove_loads", []))
-            self._data[CONF_LOADS] = [
+            remaining = [
                 load for load in current_loads if load[CONF_LOAD_NAME] not in remove_names
             ]
             if user_input.get("add_more"):
+                self._data[CONF_LOADS] = remaining
                 return await self.async_step_add_load_option()
-            return self.async_create_entry(title="", data=self._data)
+            if not remaining:
+                errors["base"] = "no_loads"
+            else:
+                self._data[CONF_LOADS] = remaining
+                return self.async_create_entry(title="", data=self._data)
 
         if not current_loads:
             # Nessun carico esistente: salta direttamente all'aggiunta
@@ -299,12 +299,15 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional("add_more", default=False): bool,
             }
         )
-        return self.async_show_form(step_id="manage_loads", data_schema=schema)
+        return self.async_show_form(
+            step_id="manage_loads", data_schema=schema, errors=errors
+        )
 
     async def async_step_add_load_option(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Aggiunge nuovi carichi, uno alla volta, dalle Opzioni."""
+        errors: dict[str, str] = {}
         if CONF_LOADS not in self._data:
             self._data[CONF_LOADS] = []
 
@@ -318,7 +321,10 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
                 )
             if user_input.get("add_another"):
                 return await self.async_step_add_load_option()
-            return self.async_create_entry(title="", data=self._data)
+            if not self._data[CONF_LOADS]:
+                errors["base"] = "no_loads"
+            else:
+                return self.async_create_entry(title="", data=self._data)
 
         schema = vol.Schema(
             {
@@ -330,5 +336,6 @@ class CasaEnergyOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="add_load_option",
             data_schema=schema,
+            errors=errors,
             description_placeholders={"count": str(len(self._data[CONF_LOADS]))},
         )

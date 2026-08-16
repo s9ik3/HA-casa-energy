@@ -27,9 +27,8 @@
       },
       "power": {
         "title": "Potenza istantanea",
-        "description": "Configura il sensore di potenza totale e le soglie di allerta.",
+        "description": "Configura la potenza massima del tuo contatore/impianto e le soglie di allerta. La potenza istantanea totale verrà calcolata sommando i carichi che aggiungerai nel prossimo passaggio.",
         "data": {
-          "total_power_sensor": "Sensore potenza totale",
           "max_power": "Potenza massima contatore/impianto (W)",
           "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
@@ -37,7 +36,7 @@
       },
       "add_load": {
         "title": "Carichi da monitorare ({count} aggiunti)",
-        "description": "Aggiungi un carico opzionale (nome + sensore di potenza). Lascia vuoto e continua per terminare.",
+        "description": "Aggiungi almeno un carico (nome + sensore di potenza in Watt): la potenza totale sarà calcolata sommando tutti i carichi aggiunti qui. Lascia vuoto e continua quando hai finito.",
         "data": {
           "name": "Nome carico",
           "entity": "Sensore potenza",
@@ -46,7 +45,8 @@
       }
     },
     "error": {
-      "no_energy_sensors": "Seleziona almeno un sensore energy."
+      "no_energy_sensors": "Seleziona almeno un sensore energy.",
+      "no_loads": "Aggiungi almeno un carico: la potenza totale viene calcolata sommandoli."
     },
     "abort": {
       "already_configured": "Questa istanza è già configurata."
@@ -71,8 +71,8 @@
       },
       "power": {
         "title": "Potenza istantanea",
+        "description": "La potenza istantanea totale viene calcolata sommando i carichi configurati nel passaggio successivo.",
         "data": {
-          "total_power_sensor": "Sensore potenza totale",
           "max_power": "Potenza massima contatore/impianto (W)",
           "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
@@ -80,7 +80,7 @@
       },
       "manage_loads": {
         "title": "Gestisci carichi",
-        "description": "Seleziona eventuali carichi da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi.",
+        "description": "Seleziona eventuali carichi da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi. Deve rimanere sempre almeno un carico.",
         "data": {
           "remove_loads": "Rimuovi carichi",
           "add_more": "Aggiungi altri carichi"
@@ -88,7 +88,7 @@
       },
       "add_load_option": {
         "title": "Aggiungi carico ({count} già presenti)",
-        "description": "Aggiungi un carico opzionale (nome + sensore di potenza). Lascia vuoto e continua per terminare.",
+        "description": "Aggiungi un carico (nome + sensore di potenza). Lascia vuoto e continua per terminare.",
         "data": {
           "name": "Nome carico",
           "entity": "Sensore potenza",
@@ -97,7 +97,8 @@
       }
     },
     "error": {
-      "no_energy_sensors": "Seleziona almeno un sensore energy."
+      "no_energy_sensors": "Seleziona almeno un sensore energy.",
+      "no_loads": "Deve rimanere almeno un carico: la potenza totale viene calcolata sommandoli."
     }
   }
 }
