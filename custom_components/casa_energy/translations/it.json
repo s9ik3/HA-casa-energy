@@ -55,7 +55,8 @@
     },
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
-      "no_loads": "Aggiungi almeno un carico: la potenza totale viene calcolata sommandoli."
+      "no_loads": "Aggiungi almeno un carico: la potenza totale viene calcolata sommandoli.",
+      "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista."
     },
     "abort": {
       "already_configured": "Questa istanza è già configurata."
@@ -124,7 +125,8 @@
     },
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
-      "no_loads": "Deve rimanere almeno un carico: la potenza totale viene calcolata sommandoli."
+      "no_loads": "Deve rimanere almeno un carico: la potenza totale viene calcolata sommandoli.",
+      "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista."
     }
   }
 }

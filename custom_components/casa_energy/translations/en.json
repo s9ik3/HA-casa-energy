@@ -55,7 +55,8 @@
     },
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
-      "no_loads": "Add at least one load: total power is calculated by summing them."
+      "no_loads": "Add at least one load: total power is calculated by summing them.",
+      "duplicate_entity": "This sensor has already been added to this list."
     },
     "abort": {
       "already_configured": "This instance is already configured."
@@ -124,7 +125,8 @@
     },
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
-      "no_loads": "At least one load must remain: total power is calculated by summing them."
+      "no_loads": "At least one load must remain: total power is calculated by summing them.",
+      "duplicate_entity": "This sensor has already been added to this list."
     }
   }
 }

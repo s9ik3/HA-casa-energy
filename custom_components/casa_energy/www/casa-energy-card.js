@@ -115,8 +115,26 @@ class CasaEnergyCard extends HTMLElement {
             border-radius: 12px;
             background: rgba(127,127,127,0.08);
             display: flex;
-            justify-content: space-between;
+            align-items: center;
+            gap: 6px;
             font-size: 12px;
+            cursor: grab;
+          }
+          .cec-load-chip:active {
+            cursor: grabbing;
+          }
+          .cec-drag-handle {
+            opacity: 0.35;
+            font-size: 13px;
+            flex-shrink: 0;
+            user-select: none;
+          }
+          .cec-chip-name {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
           .cec-month-row {
             display: flex;
@@ -228,6 +246,68 @@ class CasaEnergyCard extends HTMLElement {
     return "var(--disabled-text-color, #888)";
   }
 
+  _applyOrder(list, group) {
+    const orderKey = group === "total" ? "load_order" : "display_load_order";
+    const order = (this._config && this._config[orderKey]) || [];
+    if (!order.length) return list;
+    const byName = new Map(list.map((l) => [l.name, l]));
+    const ordered = [];
+    for (const name of order) {
+      if (byName.has(name)) {
+        ordered.push(byName.get(name));
+        byName.delete(name);
+      }
+    }
+    // Eventuali elementi nuovi non ancora presenti nell'ordine salvato
+    // (es. appena aggiunti dal config_flow) vengono accodati in fondo.
+    for (const remaining of byName.values()) ordered.push(remaining);
+    return ordered;
+  }
+
+  _saveOrder(group, names) {
+    const orderKey = group === "total" ? "load_order" : "display_load_order";
+    this._config = { ...this._config, [orderKey]: names };
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  _attachDragHandlers() {
+    ["cec-loads-full", "cec-loads-grid"].forEach((containerId) => {
+      const container = this.shadowRoot.querySelector(`#${containerId}`);
+      if (!container) return;
+      const group = containerId === "cec-loads-full" ? "total" : "display";
+
+      let draggedEl = null;
+
+      container.querySelectorAll(".cec-load-chip").forEach((chip) => {
+        chip.addEventListener("dragstart", (e) => {
+          draggedEl = chip;
+          chip.style.opacity = "0.4";
+          e.dataTransfer.effectAllowed = "move";
+        });
+        chip.addEventListener("dragend", () => {
+          chip.style.opacity = "";
+          const names = Array.from(container.querySelectorAll(".cec-load-chip")).map(
+            (c) => c.dataset.name
+          );
+          this._saveOrder(group, names);
+        });
+        chip.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (!draggedEl || draggedEl === chip) return;
+          const rect = chip.getBoundingClientRect();
+          const before = e.clientY < rect.top + rect.height / 2;
+          container.insertBefore(draggedEl, before ? chip : chip.nextSibling);
+        });
+      });
+    });
+  }
+
   _update() {
     if (!this._hass || !this._config) return;
 
@@ -254,29 +334,37 @@ class CasaEnergyCard extends HTMLElement {
       }
 
       const loads = attrs.loads || [];
-      const chip = (l) => `
-        <div class="cec-load-chip">
-          <span>${l.name}</span>
+      const chip = (l, idx, group) => `
+        <div class="cec-load-chip" draggable="true" data-name="${l.name}" data-group="${group}">
+          <span class="cec-drag-handle">⠿</span>
+          <span class="cec-chip-name">${l.name}</span>
           <span style="font-weight:700;color:${color};">${
             l.value == null ? "N/A" : Math.round(l.value) + " W"
           }</span>
         </div>
       `;
-      const totalLoads = loads.filter((l) => l.included_in_total !== false);
-      const displayLoads = loads.filter((l) => l.included_in_total === false);
+      let totalLoads = loads.filter((l) => l.included_in_total !== false);
+      let displayLoads = loads.filter((l) => l.included_in_total === false);
+      totalLoads = this._applyOrder(totalLoads, "total");
+      displayLoads = this._applyOrder(displayLoads, "display");
 
       this._loadsEl.innerHTML = `
         ${
           totalLoads.length
-            ? `<div class="cec-loads-full">${totalLoads.map(chip).join("")}</div>`
+            ? `<div class="cec-loads-full" id="cec-loads-full">${totalLoads
+                .map((l, i) => chip(l, i, "total"))
+                .join("")}</div>`
             : ""
         }
         ${
           displayLoads.length
-            ? `<div class="cec-loads-grid">${displayLoads.map(chip).join("")}</div>`
+            ? `<div class="cec-loads-grid" id="cec-loads-grid">${displayLoads
+                .map((l, i) => chip(l, i, "display"))
+                .join("")}</div>`
             : ""
         }
       `;
+      this._attachDragHandlers();
     }
 
     const historyState = this._hass.states[this._config.history_entity];
