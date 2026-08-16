@@ -214,10 +214,13 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
         # Per ogni mese, il consumo è: ultimo valore osservato nel mese meno
         # il valore osservato appena PRIMA dell'inizio del mese (o, se il
         # sensore non esisteva ancora, il primo valore disponibile in quel
-        # mese, cioè: nessun consumo pregresso da sottrarre). Questo dà un
-        # numero corretto anche il primissimo giorno di vita del sensore,
-        # perché non dipende dal numero di punti raccolti finora.
+        # mese). Se per un mese esiste UN SOLO punto storico in totale (nessun
+        # secondo campione da cui calcolare una differenza), quel mese viene
+        # marcato come "dati insufficienti" invece di mostrare 0 kWh, che
+        # sembrerebbe un consumo reale invece di un'attesa fisiologica del
+        # recorder (le statistiche giornaliere si consolidano nel tempo).
         monthly_kwh: dict[str, float] = {}
+        monthly_insufficient: dict[str, bool] = {}
         for sensor_id, entries in stats.items():
             points: list[tuple[datetime, float]] = []
             for entry_stat in entries:
@@ -243,24 +246,41 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
 
                 # Valore di riferimento: l'ultimo punto CRONOLOGICAMENTE
                 # precedente all'inizio di questo mese, se esiste tra tutti
-                # i punti raccolti (anche di mesi precedenti). Altrimenti
-                # (il sensore non esisteva prima), usa il primo valore
-                # disponibile nel mese stesso: il consumo pregresso a quel
-                # punto è per definizione sconosciuto, quindi si parte da 0.
+                # i punti raccolti (anche di mesi precedenti).
                 month_start_dt = month_points[0][0].replace(
                     day=1, hour=0, minute=0, second=0, microsecond=0
                 )
                 earlier = [v for ts, v in points if ts < month_start_dt]
-                baseline = earlier[-1] if earlier else month_points[0][1]
+
+                if earlier:
+                    baseline = earlier[-1]
+                elif len(month_points) > 1:
+                    baseline = month_points[0][1]
+                else:
+                    # Nessun punto precedente al mese E un solo punto nel
+                    # mese stesso: non c'è alcun secondo campione da cui
+                    # calcolare una differenza. Segnala come "insufficiente"
+                    # invece di produrre un 0 kWh fuorviante.
+                    monthly_insufficient[month_key] = True
+                    monthly_kwh.setdefault(month_key, 0.0)
+                    continue
 
                 delta = max(0.0, last_value - baseline)
                 monthly_kwh[month_key] = monthly_kwh.get(month_key, 0.0) + delta
 
         months = []
         for month_key in sorted(monthly_kwh.keys()):
+            insufficient = monthly_insufficient.get(month_key, False)
             kwh = round(monthly_kwh[month_key], 2)
             cost = round((kwh * price) + (kwh * extra) + fixed_cost, 2)
             cost_with_vat = round(cost * (1 + vat / 100), 2)
-            months.append({"mese": month_key, "kwh": kwh, "costo": cost_with_vat})
+            months.append(
+                {
+                    "mese": month_key,
+                    "kwh": kwh,
+                    "costo": cost_with_vat,
+                    "insufficient_data": insufficient,
+                }
+            )
 
         return {"mesi": months}

@@ -286,9 +286,16 @@ class CasaEnergyCard extends HTMLElement {
       const now = new Date();
       const ymCorr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const corr = mesi.find((m) => m.mese === ymCorr);
-      this._monthKwhEl.textContent = corr ? `${corr.kwh.toFixed(1)} kWh` : "-- kWh";
-      this._monthCostEl.textContent =
-        corr && corr.costo != null ? `~ € ${corr.costo.toFixed(2)}` : "";
+      if (corr && corr.insufficient_data) {
+        this._monthKwhEl.textContent = "In attesa dati";
+        this._monthKwhEl.style.fontSize = "12px";
+        this._monthCostEl.textContent = "Riprova tra un paio di giorni";
+      } else {
+        this._monthKwhEl.style.fontSize = "";
+        this._monthKwhEl.textContent = corr ? `${corr.kwh.toFixed(1)} kWh` : "-- kWh";
+        this._monthCostEl.textContent =
+          corr && corr.costo != null ? `~ € ${corr.costo.toFixed(2)}` : "";
+      }
       if (this._historyOpen) this._renderHistory();
     }
   }
