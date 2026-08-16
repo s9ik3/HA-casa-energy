@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CRITICAL_THRESHOLD_PCT,
+    CONF_DISPLAY_LOADS,
     CONF_INSTANCE_NAME,
     CONF_LOAD_ENTITY,
     CONF_LOAD_NAME,
@@ -102,14 +103,23 @@ class PowerStatusSensor(SensorEntity):
         self._unsub = None
 
     def _load_entities(self) -> list[str]:
+        """Entità che entrano nel calcolo del totale."""
         return [
             load[CONF_LOAD_ENTITY]
             for load in self._entry.data.get(CONF_LOADS, [])
             if load.get(CONF_LOAD_ENTITY)
         ]
 
+    def _display_only_entities(self) -> list[str]:
+        """Entità mostrate come chip separati, escluse dal totale."""
+        return [
+            load[CONF_LOAD_ENTITY]
+            for load in self._entry.data.get(CONF_DISPLAY_LOADS, [])
+            if load.get(CONF_LOAD_ENTITY)
+        ]
+
     async def async_added_to_hass(self) -> None:
-        entities = self._load_entities()
+        entities = self._load_entities() + self._display_only_entities()
         if entities:
             self._unsub = async_track_state_change_event(
                 self.hass, entities, self._handle_source_change
@@ -170,7 +180,22 @@ class PowerStatusSensor(SensorEntity):
         loads = []
         for load in data.get(CONF_LOADS, []):
             load_value = self._read_entity_value(load[CONF_LOAD_ENTITY])
-            loads.append({"name": load[CONF_LOAD_NAME], "value": load_value})
+            loads.append(
+                {
+                    "name": load[CONF_LOAD_NAME],
+                    "value": load_value,
+                    "included_in_total": True,
+                }
+            )
+        for load in data.get(CONF_DISPLAY_LOADS, []):
+            load_value = self._read_entity_value(load[CONF_LOAD_ENTITY])
+            loads.append(
+                {
+                    "name": load[CONF_LOAD_NAME],
+                    "value": load_value,
+                    "included_in_total": False,
+                }
+            )
 
         return {
             "status": status,

@@ -42,6 +42,15 @@
           "entity": "Sensore potenza",
           "add_another": "Aggiungi un altro carico dopo questo"
         }
+      },
+      "add_display_load": {
+        "title": "Dispositivi da visualizzare separatamente ({count} aggiunti)",
+        "description": "Facoltativo. Aggiungi qui dispositivi che vuoi vedere come voce a parte nella card, ma che NON vanno sommati al totale (es. se sono già inclusi dentro uno dei carichi precedenti). Lascia vuoto e continua per terminare la configurazione.",
+        "data": {
+          "name": "Nome dispositivo",
+          "entity": "Sensore potenza",
+          "add_another": "Aggiungi un altro dispositivo dopo questo"
+        }
       }
     },
     "error": {
@@ -93,6 +102,23 @@
           "name": "Nome carico",
           "entity": "Sensore potenza",
           "add_another": "Aggiungi un altro carico dopo questo"
+        }
+      },
+      "manage_display_loads": {
+        "title": "Gestisci dispositivi solo visualizzazione",
+        "description": "Questi dispositivi vengono mostrati come voce a parte in card, ma NON entrano nel calcolo del totale. Seleziona quelli da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi.",
+        "data": {
+          "remove_display_loads": "Rimuovi dispositivi",
+          "add_more": "Aggiungi altri dispositivi"
+        }
+      },
+      "add_display_load_option": {
+        "title": "Aggiungi dispositivo ({count} già presenti)",
+        "description": "Aggiungi un dispositivo da visualizzare (nome + sensore di potenza). NON entra nel calcolo del totale. Lascia vuoto e continua per terminare.",
+        "data": {
+          "name": "Nome dispositivo",
+          "entity": "Sensore potenza",
+          "add_another": "Aggiungi un altro dispositivo dopo questo"
         }
       }
     },

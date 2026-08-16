@@ -42,6 +42,15 @@
           "entity": "Power sensor",
           "add_another": "Add another load after this one"
         }
+      },
+      "add_display_load": {
+        "title": "Devices to display separately ({count} added)",
+        "description": "Optional. Add devices here that you want shown as a separate item in the card, but that should NOT be summed into the total (e.g. if they're already included in one of the previous loads). Leave empty and continue to finish setup.",
+        "data": {
+          "name": "Device name",
+          "entity": "Power sensor",
+          "add_another": "Add another device after this one"
+        }
       }
     },
     "error": {
@@ -93,6 +102,23 @@
           "name": "Load name",
           "entity": "Power sensor",
           "add_another": "Add another load after this one"
+        }
+      },
+      "manage_display_loads": {
+        "title": "Manage display-only devices",
+        "description": "These devices are shown as a separate item in the card, but are NOT summed into the total. Select any to remove, or check 'Add more' to add new ones.",
+        "data": {
+          "remove_display_loads": "Remove devices",
+          "add_more": "Add more devices"
+        }
+      },
+      "add_display_load_option": {
+        "title": "Add device ({count} already added)",
+        "description": "Add a device to display (name + power sensor). Not included in the total. Leave empty and continue to finish.",
+        "data": {
+          "name": "Device name",
+          "entity": "Power sensor",
+          "add_another": "Add another device after this one"
         }
       }
     },
