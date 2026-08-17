@@ -28,9 +28,6 @@ CONF_LOAD_ENERGY_ENTITY = "energy_entity"  # sensore energy da cui questo carico
 # che quel carico non venga conteggiato nella potenza istantanea) ---
 CONF_IGNORE_UNMATCHED = "ignore_unmatched_power"
 
-# --- Step 5: dispositivi mostrati singolarmente (lista dinamica, NON entrano nel totale) ---
-CONF_DISPLAY_LOADS = "display_loads"
-
 # --- Nome istanza (per supportare più config entry, es. Casa / Ufficio) ---
 CONF_INSTANCE_NAME = "instance_name"
 

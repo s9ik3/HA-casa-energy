@@ -249,6 +249,14 @@ class CasaEnergyCard extends HTMLElement {
     return "var(--disabled-text-color, #888)";
   }
 
+  _readPowerValue(entityId) {
+    if (!entityId || !this._hass) return null;
+    const state = this._hass.states[entityId];
+    if (!state || state.state === "unknown" || state.state === "unavailable") return null;
+    const value = parseFloat(String(state.state).replace(",", "."));
+    return isNaN(value) ? null : value;
+  }
+
   _applyOrder(list, group) {
     const orderKey = group === "total" ? "load_order" : "display_load_order";
     const order = (this._config && this._config[orderKey]) || [];
@@ -365,10 +373,17 @@ class CasaEnergyCard extends HTMLElement {
           }</span>
         </div>
       `;
-      let totalLoads = loads.filter((l) => l.included_in_total !== false);
-      let displayLoads = loads.filter((l) => l.included_in_total === false);
-      totalLoads = this._applyOrder(totalLoads, "total");
-      displayLoads = this._applyOrder(displayLoads, "display");
+      const totalLoads = this._applyOrder(loads, "total");
+      // I dispositivi "solo visualizzazione" non fanno più parte
+      // dell'integrazione: vivono nella config della card
+      // (extra_devices), e il loro valore si legge direttamente dallo
+      // stato dell'entità scelta nell'editor, non dall'attributo 'loads'
+      // del sensore (che ora contiene solo i carichi che sommano).
+      const extraDevices = (this._config.extra_devices || []).map((d) => ({
+        name: d.name,
+        value: this._readPowerValue(d.entity),
+      }));
+      const displayLoads = this._applyOrder(extraDevices, "display");
 
       if (this._isDragging) {
         // Un drag è in corso: ricostruire l'HTML delle chip adesso le
@@ -478,13 +493,21 @@ window.customCards.push({
   type: "casa-energy-card",
   name: "Casa Energy Card",
   description:
-    "Potenza istantanea, soglie di allerta, carichi monitorati e storico consumo mensile, letti dalle entità dell'integrazione Casa Energy.",
+    "Potenza istantanea, soglie di allerta, carichi monitorati e storico consumo mensile, letti dalle entità dell'integrazione Casa Energy. Permette anche di aggiungere dispositivi extra solo per visualizzazione, esclusi dal totale.",
   preview: false,
 });
 
 class CasaEnergyCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = { ...config };
+    if (this._suppressNextRender) {
+      // Il round-trip config-changed → setConfig è innescato da noi
+      // stessi (utente sta digitando in un campo di testo, es. il nome
+      // di un dispositivo extra): saltare il rebuild del DOM evita di
+      // far perdere il focus/cursore mentre si scrive.
+      this._suppressNextRender = false;
+      return;
+    }
     this._render();
   }
 
@@ -495,8 +518,8 @@ class CasaEnergyCardEditor extends HTMLElement {
     });
   }
 
-  _fireChanged() {
-    this._suppressNextRender = true;
+  _fireChanged(preserveFocus = false) {
+    this._suppressNextRender = preserveFocus;
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: this._config },
@@ -531,6 +554,84 @@ class CasaEnergyCardEditor extends HTMLElement {
 
     container.appendChild(makeRow("Sensore potenza istantanea", "power_entity"));
     container.appendChild(makeRow("Sensore storico consumi mensili", "history_entity"));
+
+    // --- Dispositivi solo visualizzazione (extra_devices) ---
+    // Non fanno parte dell'integrazione: vivono qui nella config della
+    // card, non entrano mai nel calcolo del totale, servono solo per
+    // essere mostrati come chip separati.
+    const heading = document.createElement("div");
+    heading.textContent = "Dispositivi solo visualizzazione";
+    heading.style.cssText = "font-weight:600;margin:16px 0 4px;font-size:14px;";
+    container.appendChild(heading);
+
+    const subheading = document.createElement("div");
+    subheading.textContent =
+      "Mostrati come voce a parte in card, esclusi dal totale della potenza istantanea.";
+    subheading.style.cssText = "font-size:12px;opacity:0.65;margin-bottom:10px;";
+    container.appendChild(subheading);
+
+    const extraDevices = this._config.extra_devices || [];
+    const devicesList = document.createElement("div");
+    devicesList.style.cssText = "display:flex;flex-direction:column;gap:8px;";
+
+    extraDevices.forEach((device, index) => {
+      const row = document.createElement("div");
+      row.style.cssText =
+        "display:flex;gap:8px;align-items:flex-start;padding:8px;border-radius:8px;background:rgba(127,127,127,0.06);";
+
+      const nameInput = document.createElement("ha-textfield");
+      nameInput.label = "Nome";
+      nameInput.value = device.name || "";
+      nameInput.style.flex = "1";
+      nameInput.addEventListener("input", (ev) => {
+        const updated = [...extraDevices];
+        updated[index] = { ...updated[index], name: ev.target.value };
+        this._config = { ...this._config, extra_devices: updated };
+        this._fireChanged(true);
+      });
+
+      const entityPicker = document.createElement("ha-entity-picker");
+      entityPicker.label = "Sensore potenza";
+      entityPicker.value = device.entity || "";
+      entityPicker.includeDomains = ["sensor"];
+      if (this._hass) entityPicker.hass = this._hass;
+      entityPicker.style.flex = "2";
+      entityPicker.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        const updated = [...extraDevices];
+        updated[index] = { ...updated[index], entity: ev.detail.value };
+        this._config = { ...this._config, extra_devices: updated };
+        this._fireChanged();
+      });
+
+      const removeBtn = document.createElement("ha-icon-button");
+      removeBtn.path =
+        "M19,13H5V11H19V13Z"; // minus icon path (mdi:minus)
+      removeBtn.style.flexShrink = "0";
+      removeBtn.addEventListener("click", () => {
+        const updated = extraDevices.filter((_, i) => i !== index);
+        this._config = { ...this._config, extra_devices: updated };
+        this._fireChanged();
+      });
+
+      row.appendChild(nameInput);
+      row.appendChild(entityPicker);
+      row.appendChild(removeBtn);
+      devicesList.appendChild(row);
+    });
+
+    container.appendChild(devicesList);
+
+    const addBtn = document.createElement("mwc-button");
+    addBtn.textContent = "+ Aggiungi dispositivo";
+    addBtn.style.marginTop = "10px";
+    addBtn.addEventListener("click", () => {
+      const updated = [...extraDevices, { name: "", entity: "" }];
+      this._config = { ...this._config, extra_devices: updated };
+      this._fireChanged();
+    });
+    container.appendChild(addBtn);
+
     this.appendChild(container);
   }
 }

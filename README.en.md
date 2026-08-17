@@ -30,14 +30,15 @@ After installing and restarting:
 1. Settings → Devices & services → Add integration → search **Casa Energy**
 2. Follow the guided steps:
    - **Instance name**: a label for this configuration (useful if you want to track multiple meters/homes separately in the future)
-   - **Energy sensors**: select one or more sensors with `device_class: energy` you want history for. The power sensor (Watts) of the same device is identified **automatically** (same Home Assistant device) to calculate instant power: you don't need to select it again. If a device has more than one power sensor, you'll be asked which one to use; if it has none, a blocking warning flags it (with the option to proceed anyway, accepting that device won't be counted)
+   - **Energy sensors**: select one or more sensors with `device_class: energy` you want history for. These are the devices that count toward the total instant power. The power sensor (Watts) of the same device is identified **automatically** (same Home Assistant device): you don't need to select it again. If a device has more than one power sensor, you'll be asked which one to use; if it has none, a blocking warning flags it (with the option to proceed anyway, accepting that device won't be counted)
    - **Tariff**: energy price (currency/kWh), fixed monthly costs, any extra fees, tax rate — always double-check these against your real bill
    - **Instant power**: your meter/system's maximum power, alert thresholds (as percentages)
-3. Optional: add one or more devices to show separately in the card (name + power sensor), excluded from the total — useful if a device is already included in an aggregated load
+
+If you also want to show devices that should **not** count toward the total (e.g. one already included in an aggregated load, or just something you want to keep an eye on), add them directly from the card's editor — see below.
 
 ## Changing the configuration after installation
 
-Settings → Devices & services → Casa Energy → **Configure**. You can edit energy sensors, tariff, thresholds, and manage (add/remove) display-only devices at any time, without reinstalling anything. If the energy sensor selection doesn't change, already-resolved loads (including any renames made during disambiguation) stay unchanged.
+Settings → Devices & services → Casa Energy → **Configure**. You can edit energy sensors, tariff, thresholds, and rename loads at any time, without reinstalling anything. If the energy sensor selection doesn't change, already-resolved loads (including any renames) stay unchanged.
 
 ## Included Lovelace card
 
@@ -51,6 +52,21 @@ power_entity: sensor.casa_power_status
 history_entity: sensor.casa_monthly_energy_history
 ```
 
+### Display-only devices
+
+From the card's editor you can add extra devices (name + power sensor) to show as separate chips, **excluded from the total**: useful for devices already included in an aggregated load, or just to keep an eye on them without contributing to the sum. Unlike the main loads, these don't go through the integration: they're managed entirely here, with a visual editor (name + entity picker, add/remove). In YAML:
+
+```yaml
+type: custom:casa-energy-card
+power_entity: sensor.casa_power_status
+history_entity: sensor.casa_monthly_energy_history
+extra_devices:
+  - name: "Server"
+    entity: sensor.server_power
+  - name: "Dishwasher"
+    entity: sensor.dishwasher_power
+```
+
 **Note**: automatic Lovelace resource registration requires your dashboard to be in "storage" mode (the default for most installations). If you use a fully YAML-configured dashboard, auto-registration may not succeed — in that case a log message tells you to add the resource manually (Settings → Dashboards → Resources → URL `/casa_energy_static/casa-energy-card.js`, type JavaScript module). The integration remains fully functional either way: only the automatic card step might need a small manual step on this kind of setup.
 
 If you configure multiple instances (e.g. Home and Office), the card is registered only once and stays available for all of them; it's removed only when the **last** instance is uninstalled.
@@ -62,7 +78,7 @@ For each configured instance, the integration creates:
 | Entity | Description |
 |---|---|
 | `sensor.<name>_monthly_energy_history` | State: number of months available in the history. Attribute `mesi`: array of `{mese, kwh, costo}` for each month |
-| `sensor.<name>_power_status` | State: current power in W. Attributes: `status` (`ok`/`warning`/`critical`), `percent_of_max`, `max_power`, `warning_threshold_pct`, `critical_threshold_pct`, `loads` (array of `{name, value}`) |
+| `sensor.<name>_power_status` | State: current power in W, sum of the loads configured in the integration. Attributes: `status` (`ok`/`warning`/`critical`), `percent_of_max`, `max_power`, `warning_threshold_pct`, `critical_threshold_pct`, `loads` (array of `{name, value}`) |
 
 ## Alternative YAML card (optional)
 

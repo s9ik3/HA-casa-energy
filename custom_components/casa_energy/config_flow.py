@@ -1,6 +1,7 @@
 """Config flow per l'integrazione Casa Energy."""
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 import voluptuous as vol
@@ -11,7 +12,6 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_CRITICAL_THRESHOLD_PCT,
-    CONF_DISPLAY_LOADS,
     CONF_ENERGY_SENSORS,
     CONF_EXTRA_CHARGES_PER_KWH,
     CONF_FIXED_MONTHLY_COST,
@@ -35,9 +35,6 @@ from .device_matching import resolve_power_sensors
 
 ENERGY_SENSOR_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
-)
-POWER_SENSOR_SELECTOR = selector.EntitySelector(
-    selector.EntitySelectorConfig(domain="sensor", device_class="power")
 )
 
 
@@ -257,15 +254,16 @@ class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, doma
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
 
-    # ---------- STEP 3: soglie potenza ----------
+    # ---------- STEP 3: soglie potenza (ultimo step del setup iniziale) ----------
     async def async_step_power(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             self._data.update(user_input)
-            self._data.setdefault(CONF_DISPLAY_LOADS, [])
-            return await self.async_step_add_display_load()
+            return self.async_create_entry(
+                title=self._data[CONF_INSTANCE_NAME], data=self._data
+            )
 
         schema = vol.Schema(
             {
@@ -279,46 +277,6 @@ class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, doma
             }
         )
         return self.async_show_form(step_id="power", data_schema=schema, errors=errors)
-
-    # ---------- STEP finale: dispositivi mostrati singolarmente (opzionale, NON entrano nel totale) ----------
-    async def async_step_add_display_load(
-        self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            entity = user_input.get(CONF_LOAD_ENTITY)
-            existing_entities = {
-                l[CONF_LOAD_ENTITY] for l in self._data[CONF_DISPLAY_LOADS]
-            }
-            if entity and entity in existing_entities:
-                errors["base"] = "duplicate_entity"
-            elif user_input.get(CONF_LOAD_NAME) and entity:
-                self._data[CONF_DISPLAY_LOADS].append(
-                    {
-                        CONF_LOAD_NAME: user_input[CONF_LOAD_NAME],
-                        CONF_LOAD_ENTITY: entity,
-                    }
-                )
-            if not errors:
-                if user_input.get("add_another"):
-                    return await self.async_step_add_display_load()
-                return self.async_create_entry(
-                    title=self._data[CONF_INSTANCE_NAME], data=self._data
-                )
-
-        schema = vol.Schema(
-            {
-                vol.Optional(CONF_LOAD_NAME): str,
-                vol.Optional(CONF_LOAD_ENTITY): POWER_SENSOR_SELECTOR,
-                vol.Optional("add_another", default=False): bool,
-            }
-        )
-        return self.async_show_form(
-            step_id="add_display_load",
-            data_schema=schema,
-            errors=errors,
-            description_placeholders={"count": str(len(self._data[CONF_DISPLAY_LOADS]))},
-        )
 
     @staticmethod
     @callback
@@ -335,17 +293,36 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
-        self._data: dict[str, Any] = dict(config_entry.data)
+        # Deep copy: gli step di rinomina mutano CONF_LOADS in-place. Con
+        # una copia superficiale quei dict sarebbero condivisi con
+        # config_entry.data e verrebbero modificati ancora prima che
+        # l'utente confermi (o anche se annulla il flow a metà), violando
+        # la regola di HA per cui una ConfigEntry non va mai mutata
+        # direttamente.
+        self._data: dict[str, Any] = copy.deepcopy(dict(config_entry.data))
         self._match_matched: dict[str, dict] = {}
         self._match_ambiguous: list[tuple[str, dict]] = []
         self._match_unmatched: dict[str, str] = {}
         self._confirm_queue: list[str] | None = None
-        self._rename_display_queue: list[int] | None = None
+        self._rename_loads_queue: list[int] | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         return await self.async_step_energy_sensors()
+
+    def _async_save_and_finish(self) -> config_entries.ConfigFlowResult:
+        """Salva le modifiche in entry.data (dove sensor.py e __init__.py
+        le leggono davvero) e chiude il flow. Fondamentale: chiamare
+        self.async_create_entry(data=...) qui scriverebbe in entry.options
+        anziché in entry.data — dato che l'integrazione legge sempre da
+        entry.data, quel percorso lascerebbe la card silenziosamente con
+        i valori vecchi nonostante il flow segnali un salvataggio riuscito.
+        async_update_entry() aggiorna esplicitamente entry.data; il
+        confronto con i dati precedenti fa scattare l'update_listener
+        (già registrato in __init__.py) che ricarica l'integrazione."""
+        self.hass.config_entries.async_update_entry(self._config_entry, data=self._data)
+        return self.async_create_entry(title="", data={})
 
     async def async_step_energy_sensors(
         self, user_input: dict[str, Any] | None = None
@@ -416,7 +393,8 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._data.update(user_input)
-            return await self.async_step_manage_display_loads()
+            self._rename_loads_queue = None
+            return await self.async_step_rename_loads()
 
         schema = vol.Schema(
             {
@@ -439,69 +417,32 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         )
         return self.async_show_form(step_id="power", data_schema=schema, errors=errors)
 
-    # ---------- Dispositivi solo-visualizzazione: gestione invariata ----------
-    async def async_step_manage_display_loads(
+    # ---------- Rinomina dei carichi principali (quelli sommati nel totale) ----------
+    async def async_step_rename_loads(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Mostra i dispositivi 'solo visualizzazione' già configurati e
-        permette di rimuoverli. La rinomina avviene nello step successivo
-        (uno per dispositivo, con l'entità sorgente mostrata come
-        contesto): con più dispositivi, campi tipo 'rename_0'/'rename_1'
-        senza indicazione di quale entità rappresentano rendono
-        impossibile capire quale si sta modificando. La lista può restare
-        vuota: questi dispositivi non entrano nel calcolo del totale,
-        servono solo per mostrarli come chip separati in card."""
-        current: list[dict] = list(self._data.get(CONF_DISPLAY_LOADS, []))
+        """Permette di rinominare, un carico alla volta, i dispositivi che
+        concorrono al calcolo della potenza totale (CONF_LOADS). In
+        precedenza il nome si poteva scegliere solo durante il setup
+        iniziale (o quando la selezione dei sensori energy cambiava); qui
+        è possibile farlo in qualunque momento dalle Opzioni, senza dover
+        toccare la selezione dei sensori."""
+        current: list[dict] = self._data.get(CONF_LOADS, [])
 
-        if user_input is not None:
-            remove_names = set(user_input.get("remove_display_loads", []))
-            self._data[CONF_DISPLAY_LOADS] = [
-                d for d in current if d[CONF_LOAD_NAME] not in remove_names
-            ]
-            self._data["_add_more_display_loads"] = bool(user_input.get("add_more"))
-            self._rename_display_queue = None
-            return await self.async_step_rename_display_loads()
+        if self._rename_loads_queue is None:
+            self._rename_loads_queue = list(range(len(current)))
 
-        if not current:
-            return await self.async_step_add_display_load_option()
-
-        options = [d[CONF_LOAD_NAME] for d in current]
-        schema = vol.Schema(
-            {
-                vol.Optional("remove_display_loads", default=[]): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=options, multiple=True, mode="list")
-                ),
-                vol.Optional("add_more", default=False): bool,
-            }
-        )
-        return self.async_show_form(step_id="manage_display_loads", data_schema=schema)
-
-    # ---------- Rinomina, un dispositivo alla volta (post-rimozione) ----------
-    async def async_step_rename_display_loads(
-        self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Chiede il nome di ciascun dispositivo solo-visualizzazione
-        rimasto dopo l'eventuale rimozione, uno alla volta, mostrando
-        l'entità sorgente come contesto in modo che sia sempre chiaro
-        quale dispositivo si sta rinominando."""
-        current: list[dict] = self._data.get(CONF_DISPLAY_LOADS, [])
-
-        if self._rename_display_queue is None:
-            self._rename_display_queue = list(range(len(current)))
-
-        if user_input is not None and self._rename_display_queue:
-            idx = self._rename_display_queue.pop(0)
+        if user_input is not None and self._rename_loads_queue:
+            idx = self._rename_loads_queue.pop(0)
             new_name = user_input.get(CONF_LOAD_NAME, "").strip()
             if new_name:
                 current[idx][CONF_LOAD_NAME] = new_name
 
-        if not self._rename_display_queue:
-            self._rename_display_queue = None
-            if self._data.pop("_add_more_display_loads", False):
-                return await self.async_step_add_display_load_option()
-            return self.async_create_entry(title="", data=self._data)
+        if not self._rename_loads_queue:
+            self._rename_loads_queue = None
+            return self._async_save_and_finish()
 
-        idx = self._rename_display_queue[0]
+        idx = self._rename_loads_queue[0]
         d = current[idx]
         schema = vol.Schema(
             {
@@ -509,51 +450,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
             }
         )
         return self.async_show_form(
-            step_id="rename_display_loads",
+            step_id="rename_loads",
             data_schema=schema,
             description_placeholders={"entity": d[CONF_LOAD_ENTITY]},
-        )
-
-    async def async_step_add_display_load_option(
-        self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Aggiunge nuovi dispositivi 'solo visualizzazione', uno alla
-        volta, dalle Opzioni."""
-        errors: dict[str, str] = {}
-        if CONF_DISPLAY_LOADS not in self._data:
-            self._data[CONF_DISPLAY_LOADS] = []
-
-        if user_input is not None:
-            entity = user_input.get(CONF_LOAD_ENTITY)
-            existing_entities = {
-                l[CONF_LOAD_ENTITY] for l in self._data[CONF_DISPLAY_LOADS]
-            }
-            if entity and entity in existing_entities:
-                errors["base"] = "duplicate_entity"
-            elif user_input.get(CONF_LOAD_NAME) and entity:
-                self._data[CONF_DISPLAY_LOADS].append(
-                    {
-                        CONF_LOAD_NAME: user_input[CONF_LOAD_NAME],
-                        CONF_LOAD_ENTITY: entity,
-                    }
-                )
-            if not errors:
-                if user_input.get("add_another"):
-                    return await self.async_step_add_display_load_option()
-                return self.async_create_entry(title="", data=self._data)
-
-        schema = vol.Schema(
-            {
-                vol.Optional(CONF_LOAD_NAME): str,
-                vol.Optional(CONF_LOAD_ENTITY): POWER_SENSOR_SELECTOR,
-                vol.Optional("add_another", default=False): bool,
-            }
-        )
-        return self.async_show_form(
-            step_id="add_display_load_option",
-            data_schema=schema,
-            errors=errors,
-            description_placeholders={
-                "count": str(len(self._data[CONF_DISPLAY_LOADS]))
-            },
         )

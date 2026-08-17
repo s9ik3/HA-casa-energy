@@ -30,14 +30,15 @@ Dopo l'installazione e il riavvio:
 1. Impostazioni → Dispositivi e servizi → Aggiungi integrazione → cerca **Casa Energy**
 2. Segui gli step guidati:
    - **Nome istanza**: un'etichetta per questa configurazione (utile se in futuro vuoi tracciare più contatori/case separatamente)
-   - **Sensori energy**: seleziona uno o più sensori con `device_class: energy` di cui vuoi lo storico. Il sensore di potenza (Watt) dello stesso dispositivo viene individuato **automaticamente** (stesso device Home Assistant) per calcolare la potenza istantanea: non serve selezionarlo di nuovo. Se un dispositivo ha più sensori di potenza, ti verrà chiesto quale usare; se non ne ha nessuno, un avviso bloccante te lo segnala (con possibilità di procedere comunque accettando che quel dispositivo non venga conteggiato)
+   - **Sensori energy**: seleziona uno o più sensori con `device_class: energy` di cui vuoi lo storico. Questi sono i dispositivi che concorrono al calcolo del totale della potenza istantanea. Il sensore di potenza (Watt) dello stesso dispositivo viene individuato **automaticamente** (stesso device Home Assistant): non serve selezionarlo di nuovo. Se un dispositivo ha più sensori di potenza, ti verrà chiesto quale usare; se non ne ha nessuno, un avviso bloccante te lo segnala (con possibilità di procedere comunque accettando che quel dispositivo non venga conteggiato)
    - **Tariffa**: prezzo energia (€/kWh), costi fissi mensili, eventuali oneri aggiuntivi, aliquota IVA — verifica sempre questi valori con la tua bolletta reale
    - **Potenza istantanea**: potenza massima del tuo contatore/impianto, soglie di allerta (in percentuale)
-3. Facoltativo: aggiungi uno o più dispositivi da mostrare separatamente in card (nome + sensore di potenza), esclusi dal totale — utile se un dispositivo è già incluso in un carico aggregato
+
+Se vuoi mostrare in card anche dispositivi che **non** devono contare nel totale (es. un dispositivo già incluso in un carico aggregato, o semplicemente qualcosa che vuoi solo monitorare a colpo d'occhio), si aggiungono direttamente dall'editor della card — vedi sotto.
 
 ## Modificare la configurazione dopo l'installazione
 
-Impostazioni → Dispositivi e servizi → Casa Energy → **Configura**. Puoi modificare sensori energy, tariffa, soglie e gestire (aggiungere/rimuovere) i dispositivi solo-visualizzazione in qualsiasi momento, senza reinstallare nulla. Se la selezione dei sensori energy non cambia, i carichi già risolti (incluse eventuali rinomine fatte durante la disambiguazione) restano invariati.
+Impostazioni → Dispositivi e servizi → Casa Energy → **Configura**. Puoi modificare sensori energy, tariffa, soglie e rinominare i carichi in qualsiasi momento, senza reinstallare nulla. Se la selezione dei sensori energy non cambia, i carichi già risolti (incluse eventuali rinomine) restano invariati.
 
 ## Card Lovelace inclusa
 
@@ -51,6 +52,21 @@ power_entity: sensor.casa_potenza_istantanea
 history_entity: sensor.casa_storico_consumi_mensili
 ```
 
+### Dispositivi solo visualizzazione
+
+Dall'editor della card puoi aggiungere dispositivi extra (nome + sensore di potenza) da mostrare come chip separate, **esclusi dal totale**: utili per dispositivi già inclusi in un carico aggregato, o semplicemente per tenerli d'occhio senza farli contribuire alla somma. A differenza dei carichi principali, questi non passano dall'integrazione: si gestiscono interamente qui, con un editor visuale (nome + selettore entità, aggiungi/rimuovi). In YAML:
+
+```yaml
+type: custom:casa-energy-card
+power_entity: sensor.casa_potenza_istantanea
+history_entity: sensor.casa_storico_consumi_mensili
+extra_devices:
+  - name: "Server"
+    entity: sensor.server_power
+  - name: "Lavastoviglie"
+    entity: sensor.lavastoviglie_power
+```
+
 **Nota**: la registrazione automatica della risorsa Lovelace richiede che il tuo dashboard sia in modalità "storage" (quella di default per la maggior parte delle installazioni). Se usi un dashboard configurato interamente via YAML, l'auto-registrazione potrebbe non riuscire — in quel caso un messaggio nei log ti dice di aggiungere la risorsa manualmente (Impostazioni → Dashboard → Risorse → URL `/casa_energy_static/casa-energy-card.js`, tipo Modulo JavaScript). L'integrazione resta comunque pienamente funzionante in ogni caso: solo il passaggio automatico della card potrebbe richiedere un piccolo intervento manuale su questo tipo di setup.
 
 Se configuri più istanze (es. Casa e Ufficio), la card viene registrata una sola volta e rimane disponibile per tutte; viene rimossa solo quando **l'ultima** istanza viene disinstallata.
@@ -62,7 +78,7 @@ Per ogni istanza configurata, l'integrazione crea:
 | Entità | Descrizione |
 |---|---|
 | `sensor.<nome>_storico_consumi_mensili` | Stato: numero di mesi disponibili nello storico. Attributo `mesi`: array `{mese, kwh, costo}` per ogni mese |
-| `sensor.<nome>_potenza_istantanea` | Stato: potenza attuale in W. Attributi: `status` (`ok`/`warning`/`critical`), `percent_of_max`, `max_power`, `warning_threshold_pct`, `critical_threshold_pct`, `loads` (array `{name, value}`) |
+| `sensor.<nome>_potenza_istantanea` | Stato: potenza attuale in W, somma dei carichi configurati nell'integrazione. Attributi: `status` (`ok`/`warning`/`critical`), `percent_of_max`, `max_power`, `warning_threshold_pct`, `critical_threshold_pct`, `loads` (array `{name, value}`) |
 
 ## Card YAML alternativa (opzionale)
 

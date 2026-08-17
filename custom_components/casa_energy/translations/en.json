@@ -10,7 +10,7 @@
       },
       "energy_sensors": {
         "title": "Energy consumption sensors",
-        "description": "Select one or more sensors with device_class 'energy' whose monthly history you want to track. For each one, the power sensor (Watts) of the same device will be identified automatically to calculate instant power: you don't need to select it again.",
+        "description": "Select one or more sensors with device_class 'energy' whose monthly history you want to track. For each one, the power sensor (Watts) of the same device will be identified automatically to calculate instant power: you don't need to select it again. These are the devices that count toward the total; any devices you want shown for display only, excluded from the total, are added directly from the card's editor.",
         "data": {
           "energy_sensors": "Energy sensors"
         }
@@ -54,15 +54,6 @@
           "max_power": "Maximum meter/system power (W)",
           "warning_threshold_pct": "Warning threshold (% of max power)",
           "critical_threshold_pct": "Critical threshold (% of max power)"
-        }
-      },
-      "add_display_load": {
-        "title": "Devices to display separately ({count} added)",
-        "description": "Optional. Add devices here that you want shown as a separate item in the card, but that should NOT be summed into the total (e.g. if they're already included in one of the previous loads). Leave empty and continue to finish setup.",
-        "data": {
-          "name": "Device name",
-          "entity": "Power sensor",
-          "add_another": "Add another device after this one"
         }
       }
     },
@@ -124,28 +115,11 @@
           "critical_threshold_pct": "Critical threshold (% of max power)"
         }
       },
-      "manage_display_loads": {
-        "title": "Manage display-only devices",
-        "description": "These devices are shown as a separate item in the card, but are NOT summed into the total. Select any to remove, or check 'Add more' to add new ones. Renaming happens in the next step, one device at a time.",
+      "rename_loads": {
+        "title": "Load name",
+        "description": "Power sensor (summed into the total): {entity}\n\nChoose the name to display this load with (you can keep the current name).",
         "data": {
-          "remove_display_loads": "Remove devices",
-          "add_more": "Add more devices"
-        }
-      },
-      "rename_display_loads": {
-        "title": "Device name",
-        "description": "Sensor: {entity}\n\nChoose the name to display this device with (you can keep the current name).",
-        "data": {
-          "name": "Device name"
-        }
-      },
-      "add_display_load_option": {
-        "title": "Add device ({count} already added)",
-        "description": "Add a device to display (name + power sensor). Not included in the total. Leave empty and continue to finish.",
-        "data": {
-          "name": "Device name",
-          "entity": "Power sensor",
-          "add_another": "Add another device after this one"
+          "name": "Load name"
         }
       }
     },

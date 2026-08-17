@@ -10,7 +10,7 @@
       },
       "energy_sensors": {
         "title": "Sensori consumo energia",
-        "description": "Seleziona uno o più sensori con device_class 'energy' di cui vuoi tenere lo storico mensile. Per ciascuno, il sensore di potenza (Watt) dello stesso dispositivo verrà individuato automaticamente per calcolare la potenza istantanea: non serve selezionarlo di nuovo.",
+        "description": "Seleziona uno o più sensori con device_class 'energy' di cui vuoi tenere lo storico mensile. Per ciascuno, il sensore di potenza (Watt) dello stesso dispositivo verrà individuato automaticamente per calcolare la potenza istantanea: non serve selezionarlo di nuovo. Questi sono i dispositivi che concorrono al totale; eventuali dispositivi da mostrare solo per visualizzazione, esclusi dal totale, si aggiungono direttamente dall'editor della card.",
         "data": {
           "energy_sensors": "Sensori energy"
         }
@@ -54,15 +54,6 @@
           "max_power": "Potenza massima contatore/impianto (W)",
           "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
-        }
-      },
-      "add_display_load": {
-        "title": "Dispositivi da visualizzare separatamente ({count} aggiunti)",
-        "description": "Facoltativo. Aggiungi qui dispositivi che vuoi vedere come voce a parte nella card, ma che NON vanno sommati al totale (es. se sono già inclusi dentro uno dei carichi precedenti). Lascia vuoto e continua per terminare la configurazione.",
-        "data": {
-          "name": "Nome dispositivo",
-          "entity": "Sensore potenza",
-          "add_another": "Aggiungi un altro dispositivo dopo questo"
         }
       }
     },
@@ -124,28 +115,11 @@
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
         }
       },
-      "manage_display_loads": {
-        "title": "Gestisci dispositivi solo visualizzazione",
-        "description": "Questi dispositivi vengono mostrati come voce a parte in card, ma NON entrano nel calcolo del totale. Seleziona quelli da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi. La rinomina avviene nel passaggio successivo, un dispositivo alla volta.",
+      "rename_loads": {
+        "title": "Nome del carico",
+        "description": "Sensore potenza (sommato nel totale): {entity}\n\nScegli il nome con cui mostrare questo carico nella card (puoi lasciare il nome attuale).",
         "data": {
-          "remove_display_loads": "Rimuovi dispositivi",
-          "add_more": "Aggiungi altri dispositivi"
-        }
-      },
-      "rename_display_loads": {
-        "title": "Nome del dispositivo",
-        "description": "Sensore: {entity}\n\nScegli il nome con cui mostrare questo dispositivo nella card (puoi lasciare il nome attuale).",
-        "data": {
-          "name": "Nome dispositivo"
-        }
-      },
-      "add_display_load_option": {
-        "title": "Aggiungi dispositivo ({count} già presenti)",
-        "description": "Aggiungi un dispositivo da visualizzare (nome + sensore di potenza). NON entra nel calcolo del totale. Lascia vuoto e continua per terminare.",
-        "data": {
-          "name": "Nome dispositivo",
-          "entity": "Sensore potenza",
-          "add_another": "Aggiungi un altro dispositivo dopo questo"
+          "name": "Nome carico"
         }
       }
     },
