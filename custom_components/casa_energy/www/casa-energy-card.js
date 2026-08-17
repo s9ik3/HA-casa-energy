@@ -119,18 +119,6 @@ class CasaEnergyCard extends HTMLElement {
             gap: 6px;
             font-size: 12px;
           }
-          .cec-load-chip[draggable="true"] {
-            cursor: grab;
-          }
-          .cec-load-chip[draggable="true"]:active {
-            cursor: grabbing;
-          }
-          .cec-drag-handle {
-            opacity: 0.35;
-            font-size: 13px;
-            flex-shrink: 0;
-            user-select: none;
-          }
           .cec-chip-name {
             flex: 1;
             min-width: 0;
@@ -232,7 +220,6 @@ class CasaEnergyCard extends HTMLElement {
     this._historyEl = this.shadowRoot.querySelector("#cec-history");
     this._toggleArrow = this.shadowRoot.querySelector("#cec-toggle-arrow");
     this._historyOpen = false;
-    this._isDragging = false;
 
     this.shadowRoot.querySelector("#cec-month-row").addEventListener("click", () => {
       this._historyOpen = !this._historyOpen;
@@ -275,69 +262,6 @@ class CasaEnergyCard extends HTMLElement {
     return ordered;
   }
 
-  _saveOrder(group, names) {
-    const orderKey = group === "total" ? "load_order" : "display_load_order";
-    this._config = { ...this._config, [orderKey]: names };
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: this._config },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  _attachDragHandlers() {
-    ["cec-loads-full", "cec-loads-grid"].forEach((containerId) => {
-      const container = this.shadowRoot.querySelector(`#${containerId}`);
-      if (!container) return;
-      const group = containerId === "cec-loads-full" ? "total" : "display";
-
-      let draggedEl = null;
-
-      container.querySelectorAll(".cec-load-chip").forEach((chip) => {
-        chip.addEventListener("dragstart", (e) => {
-          draggedEl = chip;
-          this._isDragging = true;
-          chip.style.opacity = "0.4";
-          e.dataTransfer.effectAllowed = "move";
-        });
-        chip.addEventListener("dragend", () => {
-          chip.style.opacity = "";
-          const names = Array.from(container.querySelectorAll(".cec-load-chip")).map(
-            (c) => c.dataset.name
-          );
-          this._isDragging = false;
-          this._saveOrder(group, names);
-          // L'aggiornamento del DOM delle chip era sospeso durante il
-          // drag (per non farlo saltare via da un aggiornamento di stato
-          // in tempo reale): riallineiamo ora ai dati più recenti.
-          if (this._hass) this._update();
-        });
-        chip.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          if (!draggedEl || draggedEl === chip) return;
-          const rect = chip.getBoundingClientRect();
-          const before = e.clientY < rect.top + rect.height / 2;
-          container.insertBefore(draggedEl, before ? chip : chip.nextSibling);
-        });
-      });
-    });
-  }
-
-  _updateChipValuesInPlace(loads, color) {
-    const byName = new Map(loads.map((l) => [l.name, l]));
-    this._loadsEl.querySelectorAll(".cec-load-chip").forEach((chipEl) => {
-      const load = byName.get(chipEl.dataset.name);
-      if (!load) return;
-      const valueEl = chipEl.querySelector(".cec-chip-value");
-      if (valueEl) {
-        valueEl.textContent = load.value == null ? "N/A" : Math.round(load.value) + " W";
-        valueEl.style.color = color;
-      }
-    });
-  }
-
   _update() {
     if (!this._hass || !this._config) return;
 
@@ -364,9 +288,8 @@ class CasaEnergyCard extends HTMLElement {
       }
 
       const loads = attrs.loads || [];
-      const chip = (l, idx, group) => `
-        <div class="cec-load-chip" draggable="true" data-name="${l.name}" data-group="${group}">
-          <span class="cec-drag-handle">⠿</span>
+      const chip = (l) => `
+        <div class="cec-load-chip">
           <span class="cec-chip-name">${l.name}</span>
           <span class="cec-chip-value" style="font-weight:700;color:${color};">${
             l.value == null ? "N/A" : Math.round(l.value) + " W"
@@ -385,32 +308,26 @@ class CasaEnergyCard extends HTMLElement {
       }));
       const displayLoads = this._applyOrder(extraDevices, "display");
 
-      if (this._isDragging) {
-        // Un drag è in corso: ricostruire l'HTML delle chip adesso le
-        // strapperebbe da sotto al puntatore dell'utente. Aggiorniamo
-        // solo i valori numerici sulle chip già presenti nel DOM, senza
-        // toccarne l'ordine o l'esistenza; il rebuild completo avviene
-        // al termine del drag (dragend).
-        this._updateChipValuesInPlace([...totalLoads, ...displayLoads], color);
-      } else {
-        this._loadsEl.innerHTML = `
-          ${
-            totalLoads.length
-              ? `<div class="cec-loads-full" id="cec-loads-full">${totalLoads
-                  .map((l, i) => chip(l, i, "total"))
-                  .join("")}</div>`
-              : ""
-          }
-          ${
-            displayLoads.length
-              ? `<div class="cec-loads-grid" id="cec-loads-grid">${displayLoads
-                  .map((l, i) => chip(l, i, "display"))
-                  .join("")}</div>`
-              : ""
-          }
-        `;
-        this._attachDragHandlers();
-      }
+      // L'ordine delle chip si decide esclusivamente dall'editor della
+      // card (drag & drop lì, non più qui): sulla card le chip sono
+      // statiche, quindi possiamo sempre rigenerare l'HTML senza doverci
+      // preoccupare di interrompere un trascinamento in corso.
+      this._loadsEl.innerHTML = `
+        ${
+          totalLoads.length
+            ? `<div class="cec-loads-full" id="cec-loads-full">${totalLoads
+                .map((l) => chip(l))
+                .join("")}</div>`
+            : ""
+        }
+        ${
+          displayLoads.length
+            ? `<div class="cec-loads-grid" id="cec-loads-grid">${displayLoads
+                .map((l) => chip(l))
+                .join("")}</div>`
+            : ""
+        }
+      `;
     }
 
     const historyState = this._hass.states[this._config.history_entity];
@@ -512,10 +429,19 @@ class CasaEnergyCardEditor extends HTMLElement {
   }
 
   set hass(hass) {
+    const hadHass = !!this._hass;
     this._hass = hass;
     this.querySelectorAll("ha-entity-picker").forEach((el) => {
       el.hass = hass;
     });
+    // Se hass arriva dopo setConfig (o il primo render è avvenuto senza
+    // hass ancora disponibile), la sezione "Ordine carichi principali"
+    // dipende dallo stato di power_entity: serve un render completo la
+    // prima volta che hass diventa disponibile, altrimenti quella
+    // sezione resterebbe assente finché l'utente non tocca altro.
+    if (!hadHass && this._config) {
+      this._render();
+    }
   }
 
   _fireChanged(preserveFocus = false) {
@@ -527,6 +453,81 @@ class CasaEnergyCardEditor extends HTMLElement {
         composed: true,
       })
     );
+  }
+
+  _applyOrder(list, group) {
+    const orderKey = group === "total" ? "load_order" : "display_load_order";
+    const order = (this._config && this._config[orderKey]) || [];
+    if (!order.length) return list;
+    const byName = new Map(list.map((l) => [l.name, l]));
+    const ordered = [];
+    for (const name of order) {
+      if (byName.has(name)) {
+        ordered.push(byName.get(name));
+        byName.delete(name);
+      }
+    }
+    for (const remaining of byName.values()) ordered.push(remaining);
+    return ordered;
+  }
+
+  _saveOrder(group, names) {
+    const orderKey = group === "total" ? "load_order" : "display_load_order";
+    this._config = { ...this._config, [orderKey]: names };
+    this._fireChanged();
+  }
+
+  // Righe riordinabili via drag, in stile HA nativo: maniglia "☰" a
+  // sinistra, contenuto al centro, azioni opzionali a destra. Usata sia
+  // per l'elenco dei carichi principali (sola lettura, solo riordino)
+  // sia per i dispositivi extra (con campi editabili annessi via
+  // extraContent). Il riordino avviene qui nell'editor, non più con
+  // drag sulle chip della card.
+  _makeSortableList(items, group, renderContent) {
+    const list = document.createElement("div");
+    list.style.cssText = "display:flex;flex-direction:column;gap:6px;";
+
+    let draggedRow = null;
+
+    items.forEach((item, index) => {
+      const row = document.createElement("div");
+      row.dataset.name = item.name;
+      row.style.cssText =
+        "display:flex;align-items:center;gap:8px;padding:6px;border-radius:8px;background:rgba(127,127,127,0.06);";
+
+      const handle = document.createElement("span");
+      handle.textContent = "☰";
+      handle.draggable = true;
+      handle.title = "Trascina per riordinare";
+      handle.style.cssText =
+        "cursor:grab;opacity:0.5;font-size:16px;flex-shrink:0;user-select:none;padding:4px;";
+
+      handle.addEventListener("dragstart", (e) => {
+        draggedRow = row;
+        row.style.opacity = "0.4";
+        e.dataTransfer.effectAllowed = "move";
+      });
+      row.addEventListener("dragend", () => {
+        row.style.opacity = "";
+        if (draggedRow !== row) return;
+        draggedRow = null;
+        const names = Array.from(list.children).map((r) => r.dataset.name);
+        this._saveOrder(group, names);
+      });
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (!draggedRow || draggedRow === row) return;
+        const rect = row.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        list.insertBefore(draggedRow, before ? row : row.nextSibling);
+      });
+
+      row.appendChild(handle);
+      renderContent(row, item, index);
+      list.appendChild(row);
+    });
+
+    return list;
   }
 
   _render() {
@@ -555,6 +556,37 @@ class CasaEnergyCardEditor extends HTMLElement {
     container.appendChild(makeRow("Sensore potenza istantanea", "power_entity"));
     container.appendChild(makeRow("Sensore storico consumi mensili", "history_entity"));
 
+    // --- Ordine carichi principali ---
+    // Sola lettura qui: i carichi (nome + sensore) sono decisi
+    // dall'integrazione (Configura → sensori energy), qui si può solo
+    // scegliere in che ordine mostrarli in card.
+    const powerState = this._hass && this._config.power_entity
+      ? this._hass.states[this._config.power_entity]
+      : null;
+    const mainLoads = (powerState && powerState.attributes && powerState.attributes.loads) || [];
+
+    if (mainLoads.length) {
+      const loadsHeading = document.createElement("div");
+      loadsHeading.textContent = "Ordine carichi principali";
+      loadsHeading.style.cssText = "font-weight:600;margin:16px 0 4px;font-size:14px;";
+      container.appendChild(loadsHeading);
+
+      const loadsSubheading = document.createElement("div");
+      loadsSubheading.textContent =
+        "Trascina per cambiare l'ordine con cui compaiono in card. Per aggiungere, rimuovere o rinominare un carico, usa Configura sull'integrazione.";
+      loadsSubheading.style.cssText = "font-size:12px;opacity:0.65;margin-bottom:10px;";
+      container.appendChild(loadsSubheading);
+
+      const orderedLoads = this._applyOrder(mainLoads, "total");
+      const loadsList = this._makeSortableList(orderedLoads, "total", (row, item) => {
+        const name = document.createElement("span");
+        name.textContent = item.name;
+        name.style.cssText = "flex:1;font-size:14px;";
+        row.appendChild(name);
+      });
+      container.appendChild(loadsList);
+    }
+
     // --- Dispositivi solo visualizzazione (extra_devices) ---
     // Non fanno parte dell'integrazione: vivono qui nella config della
     // card, non entrano mai nel calcolo del totale, servono solo per
@@ -566,26 +598,35 @@ class CasaEnergyCardEditor extends HTMLElement {
 
     const subheading = document.createElement("div");
     subheading.textContent =
-      "Mostrati come voce a parte in card, esclusi dal totale della potenza istantanea.";
+      "Mostrati come voce a parte in card, esclusi dal totale della potenza istantanea. Trascina per riordinare.";
     subheading.style.cssText = "font-size:12px;opacity:0.65;margin-bottom:10px;";
     container.appendChild(subheading);
 
-    const extraDevices = this._config.extra_devices || [];
-    const devicesList = document.createElement("div");
-    devicesList.style.cssText = "display:flex;flex-direction:column;gap:8px;";
+    const extraDevices = this._applyOrder(this._config.extra_devices || [], "display");
 
-    extraDevices.forEach((device, index) => {
-      const row = document.createElement("div");
-      row.style.cssText =
-        "display:flex;gap:8px;align-items:flex-start;padding:8px;border-radius:8px;background:rgba(127,127,127,0.06);";
+    const devicesList = this._makeSortableList(extraDevices, "display", (row, device) => {
+      // L'indice nell'array originale (non ordinato) serve per aggiornare
+      // correttamente extra_devices quando l'utente modifica un campo;
+      // l'ordine di visualizzazione è invece gestito da display_load_order.
+      const findOriginalIndex = () =>
+        (this._config.extra_devices || []).findIndex((d) => d === device);
 
-      const nameInput = document.createElement("ha-textfield");
-      nameInput.label = "Nome";
+      // Un <input> nativo invece di ha-textfield: quest'ultimo è un
+      // componente interno del frontend HA, non garantito disponibile
+      // né stabile per l'uso da custom card esterne — nel nostro caso
+      // non renderizzava affatto il campo. Uno stile inline lo rende
+      // comunque coerente con l'aspetto dell'editor HA.
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.placeholder = "Nome";
       nameInput.value = device.name || "";
-      nameInput.style.flex = "1";
+      nameInput.style.cssText =
+        "flex:1 1 100px;min-width:90px;padding:10px 8px;border-radius:4px;border:1px solid var(--divider-color, #ccc);background:var(--card-background-color, #fff);color:var(--primary-text-color, #000);font-size:14px;box-sizing:border-box;";
       nameInput.addEventListener("input", (ev) => {
-        const updated = [...extraDevices];
-        updated[index] = { ...updated[index], name: ev.target.value };
+        const idx = findOriginalIndex();
+        if (idx < 0) return;
+        const updated = [...this._config.extra_devices];
+        updated[idx] = { ...updated[idx], name: ev.target.value };
         this._config = { ...this._config, extra_devices: updated };
         this._fireChanged(true);
       });
@@ -595,21 +636,29 @@ class CasaEnergyCardEditor extends HTMLElement {
       entityPicker.value = device.entity || "";
       entityPicker.includeDomains = ["sensor"];
       if (this._hass) entityPicker.hass = this._hass;
-      entityPicker.style.flex = "2";
+      entityPicker.style.cssText = "flex:2 1 180px;min-width:160px;";
       entityPicker.addEventListener("value-changed", (ev) => {
         ev.stopPropagation();
-        const updated = [...extraDevices];
-        updated[index] = { ...updated[index], entity: ev.detail.value };
+        const idx = findOriginalIndex();
+        if (idx < 0) return;
+        const updated = [...this._config.extra_devices];
+        updated[idx] = { ...updated[idx], entity: ev.detail.value };
         this._config = { ...this._config, extra_devices: updated };
         this._fireChanged();
       });
 
-      const removeBtn = document.createElement("ha-icon-button");
-      removeBtn.path =
-        "M19,13H5V11H19V13Z"; // minus icon path (mdi:minus)
-      removeBtn.style.flexShrink = "0";
+      // Pulsante nativo invece di ha-icon-button, stessa motivazione di
+      // affidabilità cross-versione di nameInput.
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.textContent = "✕";
+      removeBtn.title = "Rimuovi dispositivo";
+      removeBtn.style.cssText =
+        "flex-shrink:0;width:36px;height:36px;border-radius:50%;border:none;background:rgba(127,127,127,0.15);color:var(--primary-text-color, #000);font-size:14px;cursor:pointer;";
       removeBtn.addEventListener("click", () => {
-        const updated = extraDevices.filter((_, i) => i !== index);
+        const idx = findOriginalIndex();
+        if (idx < 0) return;
+        const updated = (this._config.extra_devices || []).filter((_, i) => i !== idx);
         this._config = { ...this._config, extra_devices: updated };
         this._fireChanged();
       });
@@ -617,16 +666,18 @@ class CasaEnergyCardEditor extends HTMLElement {
       row.appendChild(nameInput);
       row.appendChild(entityPicker);
       row.appendChild(removeBtn);
-      devicesList.appendChild(row);
     });
 
     container.appendChild(devicesList);
 
-    const addBtn = document.createElement("mwc-button");
+    // Pulsante nativo invece di mwc-button, stessa motivazione.
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.textContent = "+ Aggiungi dispositivo";
-    addBtn.style.marginTop = "10px";
+    addBtn.style.cssText =
+      "margin-top:10px;padding:8px 14px;border-radius:4px;border:1px solid var(--primary-color, #03a9f4);background:transparent;color:var(--primary-color, #03a9f4);font-size:14px;font-weight:500;cursor:pointer;";
     addBtn.addEventListener("click", () => {
-      const updated = [...extraDevices, { name: "", entity: "" }];
+      const updated = [...(this._config.extra_devices || []), { name: "", entity: "" }];
       this._config = { ...this._config, extra_devices: updated };
       this._fireChanged();
     });
