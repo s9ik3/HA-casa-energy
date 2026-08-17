@@ -232,6 +232,7 @@ class CasaEnergyCard extends HTMLElement {
     this._historyEl = this.shadowRoot.querySelector("#cec-history");
     this._toggleArrow = this.shadowRoot.querySelector("#cec-toggle-arrow");
     this._historyOpen = false;
+    this._isDragging = false;
 
     this.shadowRoot.querySelector("#cec-month-row").addEventListener("click", () => {
       this._historyOpen = !this._historyOpen;
@@ -289,6 +290,7 @@ class CasaEnergyCard extends HTMLElement {
       container.querySelectorAll(".cec-load-chip").forEach((chip) => {
         chip.addEventListener("dragstart", (e) => {
           draggedEl = chip;
+          this._isDragging = true;
           chip.style.opacity = "0.4";
           e.dataTransfer.effectAllowed = "move";
         });
@@ -297,7 +299,12 @@ class CasaEnergyCard extends HTMLElement {
           const names = Array.from(container.querySelectorAll(".cec-load-chip")).map(
             (c) => c.dataset.name
           );
+          this._isDragging = false;
           this._saveOrder(group, names);
+          // L'aggiornamento del DOM delle chip era sospeso durante il
+          // drag (per non farlo saltare via da un aggiornamento di stato
+          // in tempo reale): riallineiamo ora ai dati più recenti.
+          if (this._hass) this._update();
         });
         chip.addEventListener("dragover", (e) => {
           e.preventDefault();
@@ -307,6 +314,19 @@ class CasaEnergyCard extends HTMLElement {
           container.insertBefore(draggedEl, before ? chip : chip.nextSibling);
         });
       });
+    });
+  }
+
+  _updateChipValuesInPlace(loads, color) {
+    const byName = new Map(loads.map((l) => [l.name, l]));
+    this._loadsEl.querySelectorAll(".cec-load-chip").forEach((chipEl) => {
+      const load = byName.get(chipEl.dataset.name);
+      if (!load) return;
+      const valueEl = chipEl.querySelector(".cec-chip-value");
+      if (valueEl) {
+        valueEl.textContent = load.value == null ? "N/A" : Math.round(load.value) + " W";
+        valueEl.style.color = color;
+      }
     });
   }
 
@@ -336,12 +356,11 @@ class CasaEnergyCard extends HTMLElement {
       }
 
       const loads = attrs.loads || [];
-      const editMode = !!this._hass.editMode;
       const chip = (l, idx, group) => `
-        <div class="cec-load-chip" ${editMode ? 'draggable="true"' : ""} data-name="${l.name}" data-group="${group}">
-          ${editMode ? '<span class="cec-drag-handle">⠿</span>' : ""}
+        <div class="cec-load-chip" draggable="true" data-name="${l.name}" data-group="${group}">
+          <span class="cec-drag-handle">⠿</span>
           <span class="cec-chip-name">${l.name}</span>
-          <span style="font-weight:700;color:${color};">${
+          <span class="cec-chip-value" style="font-weight:700;color:${color};">${
             l.value == null ? "N/A" : Math.round(l.value) + " W"
           }</span>
         </div>
@@ -351,23 +370,32 @@ class CasaEnergyCard extends HTMLElement {
       totalLoads = this._applyOrder(totalLoads, "total");
       displayLoads = this._applyOrder(displayLoads, "display");
 
-      this._loadsEl.innerHTML = `
-        ${
-          totalLoads.length
-            ? `<div class="cec-loads-full" id="cec-loads-full">${totalLoads
-                .map((l, i) => chip(l, i, "total"))
-                .join("")}</div>`
-            : ""
-        }
-        ${
-          displayLoads.length
-            ? `<div class="cec-loads-grid" id="cec-loads-grid">${displayLoads
-                .map((l, i) => chip(l, i, "display"))
-                .join("")}</div>`
-            : ""
-        }
-      `;
-      if (editMode) this._attachDragHandlers();
+      if (this._isDragging) {
+        // Un drag è in corso: ricostruire l'HTML delle chip adesso le
+        // strapperebbe da sotto al puntatore dell'utente. Aggiorniamo
+        // solo i valori numerici sulle chip già presenti nel DOM, senza
+        // toccarne l'ordine o l'esistenza; il rebuild completo avviene
+        // al termine del drag (dragend).
+        this._updateChipValuesInPlace([...totalLoads, ...displayLoads], color);
+      } else {
+        this._loadsEl.innerHTML = `
+          ${
+            totalLoads.length
+              ? `<div class="cec-loads-full" id="cec-loads-full">${totalLoads
+                  .map((l, i) => chip(l, i, "total"))
+                  .join("")}</div>`
+              : ""
+          }
+          ${
+            displayLoads.length
+              ? `<div class="cec-loads-grid" id="cec-loads-grid">${displayLoads
+                  .map((l, i) => chip(l, i, "display"))
+                  .join("")}</div>`
+              : ""
+          }
+        `;
+        this._attachDragHandlers();
+      }
     }
 
     const historyState = this._hass.states[this._config.history_entity];

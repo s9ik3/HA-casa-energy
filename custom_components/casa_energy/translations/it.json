@@ -30,6 +30,23 @@
           "ignore_unmatched_power": "Procedi comunque (questi dispositivi non conteranno nel totale)"
         }
       },
+      "confirm_load_names": {
+        "title": "Nome del carico",
+        "description": "Sensore energy: {energy_entity}\nSensore potenza abbinato automaticamente: {power_entity}\n\nScegli il nome con cui mostrare questo carico nella card (puoi lasciare il nome proposto).",
+        "data": {
+          "name": "Nome carico"
+        }
+      },
+      "tariff": {
+        "title": "Tariffa elettrica",
+        "description": "Inserisci i dati della tua tariffa per calcolare una stima del costo mensile. Verifica sempre questi valori con la tua bolletta reale.",
+        "data": {
+          "price_per_kwh": "Prezzo energia (per kWh)",
+          "fixed_monthly_cost": "Costi fissi mensili",
+          "extra_charges_per_kwh": "Oneri/accise aggiuntivi (per kWh, opzionale)",
+          "vat_rate": "Aliquota IVA (%)"
+        }
+      },
       "power": {
         "title": "Potenza istantanea",
         "description": "Configura la potenza massima del tuo contatore/impianto e le soglie di allerta. La potenza istantanea totale è calcolata sommando i sensori power abbinati automaticamente ai sensori energy selezionati in precedenza.",
@@ -80,6 +97,13 @@
         "description": "Per questi dispositivi non è stato trovato un sensore di potenza (Watt) abbinato: {devices}. Non verranno conteggiati nella potenza istantanea totale finché non aggiungi un sensore power a quel dispositivo. Spunta la casella per procedere comunque accettando questo limite, oppure torna indietro e rivedi la selezione.",
         "data": {
           "ignore_unmatched_power": "Procedi comunque (questi dispositivi non conteranno nel totale)"
+        }
+      },
+      "confirm_load_names": {
+        "title": "Nome del carico",
+        "description": "Sensore energy: {energy_entity}\nSensore potenza abbinato automaticamente: {power_entity}\n\nScegli il nome con cui mostrare questo carico nella card (puoi lasciare il nome proposto).",
+        "data": {
+          "name": "Nome carico"
         }
       },
       "tariff": {

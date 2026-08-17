@@ -57,20 +57,60 @@ class _DeviceMatchingMixin:
         self._match_matched = result.matched
         self._match_ambiguous = list(result.ambiguous.items())
         self._match_unmatched = result.unmatched
+        self._confirm_queue = None
 
         return await self._async_continue_matching()
 
     async def _async_continue_matching(self) -> config_entries.ConfigFlowResult:
         """Prosegue la risoluzione dopo un eventuale step di
         disambiguazione: se restano ambiguità le chiede, altrimenti
-        gestisce i non risolti, altrimenti finalizza."""
+        gestisce i non risolti, altrimenti passa alla conferma dei nomi."""
         if self._match_ambiguous:
             return await self.async_step_ambiguous_power()
 
         if self._match_unmatched and not self._data.get(CONF_IGNORE_UNMATCHED):
             return await self.async_step_unmatched_power()
 
-        return await self._async_finalize_loads()
+        return await self.async_step_confirm_load_names()
+
+    # ---------- Step: conferma/rinomina di tutti i carichi risolti ----------
+    async def async_step_confirm_load_names(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Mostra, un carico alla volta, il nome proposto per ciascun
+        dispositivo individuato automaticamente (o già disambiguato),
+        permettendo di rinominarlo subito invece di dover passare dalle
+        Opzioni in un secondo momento. Un carico per step (invece di un
+        form con più campi insieme) perché le label di campi generati
+        dinamicamente non sono traducibili singolarmente in HA."""
+        if self._confirm_queue is None:
+            self._confirm_queue = list(self._match_matched.keys())
+
+        if user_input is not None and self._confirm_queue:
+            energy_entity = self._confirm_queue.pop(0)
+            new_name = user_input.get(CONF_LOAD_NAME, "").strip()
+            if new_name:
+                self._match_matched[energy_entity]["name"] = new_name
+
+        if not self._confirm_queue:
+            self._confirm_queue = None
+            return await self._async_finalize_loads()
+
+        energy_entity = self._confirm_queue[0]
+        info = self._match_matched[energy_entity]
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_LOAD_NAME, default=info["name"]): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="confirm_load_names",
+            data_schema=schema,
+            description_placeholders={
+                "energy_entity": energy_entity,
+                "power_entity": info["power_entity"],
+            },
+        )
 
     async def _async_finalize_loads(self) -> config_entries.ConfigFlowResult:
         """Costruisce CONF_LOADS a partire dai match risolti (auto +
@@ -156,6 +196,7 @@ class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, doma
         self._match_matched: dict[str, dict] = {}
         self._match_ambiguous: list[tuple[str, dict]] = []
         self._match_unmatched: dict[str, str] = {}
+        self._confirm_queue: list[str] | None = None
 
     # ---------- STEP 0: nome istanza ----------
     async def async_step_user(
@@ -298,6 +339,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         self._match_matched: dict[str, dict] = {}
         self._match_ambiguous: list[tuple[str, dict]] = []
         self._match_unmatched: dict[str, str] = {}
+        self._confirm_queue: list[str] | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

@@ -30,6 +30,23 @@
           "ignore_unmatched_power": "Proceed anyway (these devices won't count toward the total)"
         }
       },
+      "confirm_load_names": {
+        "title": "Load name",
+        "description": "Energy sensor: {energy_entity}\nAutomatically matched power sensor: {power_entity}\n\nChoose the name to display this load with (you can keep the suggested name).",
+        "data": {
+          "name": "Load name"
+        }
+      },
+      "tariff": {
+        "title": "Electricity tariff",
+        "description": "Enter your tariff details to calculate an estimated monthly cost. Always double-check these values against your real bill.",
+        "data": {
+          "price_per_kwh": "Energy price (per kWh)",
+          "fixed_monthly_cost": "Fixed monthly costs",
+          "extra_charges_per_kwh": "Extra fees/taxes (per kWh, optional)",
+          "vat_rate": "Tax rate (%)"
+        }
+      },
       "power": {
         "title": "Instant power",
         "description": "Configure your meter/system's maximum power and alert thresholds. Total instant power is calculated by summing the power sensors automatically matched to the energy sensors selected earlier.",
@@ -80,6 +97,13 @@
         "description": "No matching power sensor (Watts) was found for these devices: {devices}. They won't be counted in the total instant power until you add a power sensor to that device. Check the box to proceed anyway accepting this limitation, or go back and review your selection.",
         "data": {
           "ignore_unmatched_power": "Proceed anyway (these devices won't count toward the total)"
+        }
+      },
+      "confirm_load_names": {
+        "title": "Load name",
+        "description": "Energy sensor: {energy_entity}\nAutomatically matched power sensor: {power_entity}\n\nChoose the name to display this load with (you can keep the suggested name).",
+        "data": {
+          "name": "Load name"
         }
       },
       "tariff": {
