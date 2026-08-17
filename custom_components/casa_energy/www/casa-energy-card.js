@@ -244,6 +244,17 @@ class CasaEnergyCard extends HTMLElement {
     return isNaN(value) ? null : value;
   }
 
+  // Applica un'etichetta personalizzata (scelta dall'editor) sopra il
+  // nome originale del carico, senza modificarlo: l'ordine (_applyOrder)
+  // e il collegamento coi dati del sensore restano chiavi sul nome
+  // originale, così rinominare un carico non rompe l'ordine salvato né
+  // il matching coi valori letti dal sensore.
+  _withLabel(item, labelsKey) {
+    const labels = (this._config && this._config[labelsKey]) || {};
+    const label = labels[item.name];
+    return label ? { ...item, name: label } : item;
+  }
+
   _applyOrder(list, group) {
     const orderKey = group === "total" ? "load_order" : "display_load_order";
     const order = (this._config && this._config[orderKey]) || [];
@@ -296,7 +307,9 @@ class CasaEnergyCard extends HTMLElement {
           }</span>
         </div>
       `;
-      const totalLoads = this._applyOrder(loads, "total");
+      const totalLoads = this._applyOrder(loads, "total").map((l) =>
+        this._withLabel(l, "load_labels")
+      );
       // I dispositivi "solo visualizzazione" non fanno più parte
       // dell'integrazione: vivono nella config della card
       // (extra_devices), e il loro valore si legge direttamente dallo
@@ -477,6 +490,105 @@ class CasaEnergyCardEditor extends HTMLElement {
     this._fireChanged();
   }
 
+  // Apre la schermata dedicata di rinomina per un singolo elemento.
+  // group: "total" (carico principale, salva in load_labels, chiave =
+  // nome originale) o "display" (dispositivo extra, chiave = indice
+  // nell'array extra_devices, perché lì il nome PUÒ ripetersi — es. due
+  // dispositivi aggiunti di recente con nome ancora vuoto — quindi il
+  // nome da solo non basta a identificare la riga in modo univoco).
+  _openRename(group, key) {
+    this._renameTarget = { group, key };
+    this._render();
+  }
+
+  _closeRename() {
+    this._renameTarget = null;
+    this._render();
+  }
+
+  _currentLabel(group, key) {
+    if (group === "total") {
+      const labels = (this._config && this._config.load_labels) || {};
+      return labels[key] || key;
+    }
+    const device = (this._config.extra_devices || [])[key];
+    return device ? device.name || "" : "";
+  }
+
+  _saveRename(group, key, newLabel) {
+    const trimmed = (newLabel || "").trim();
+    if (!trimmed) return;
+
+    if (group === "total") {
+      const labels = { ...((this._config && this._config.load_labels) || {}) };
+      labels[key] = trimmed;
+      this._config = { ...this._config, load_labels: labels };
+    } else {
+      const devices = [...(this._config.extra_devices || [])];
+      if (devices[key]) {
+        devices[key] = { ...devices[key], name: trimmed };
+        this._config = { ...this._config, extra_devices: devices };
+      }
+    }
+    this._fireChanged();
+  }
+
+  // Schermata dedicata: sostituisce l'intera lista con un solo campo di
+  // testo per l'elemento scelto, più Indietro/Salva. Usata sia per i
+  // carichi principali sia per i dispositivi extra (stessa logica,
+  // cambia solo dove va salvato il risultato).
+  _renderRenameScreen(container) {
+    const { group, key } = this._renameTarget;
+    const currentLabel = this._currentLabel(group, key);
+
+    const backRow = document.createElement("div");
+    backRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:16px;";
+    const backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.textContent = "← Indietro";
+    backBtn.style.cssText =
+      "padding:6px 12px;border-radius:4px;border:1px solid var(--divider-color, #ccc);background:transparent;color:var(--primary-text-color, #000);font-size:13px;cursor:pointer;";
+    backBtn.addEventListener("click", () => this._closeRename());
+    backRow.appendChild(backBtn);
+    container.appendChild(backRow);
+
+    const heading = document.createElement("div");
+    heading.textContent =
+      group === "total" ? "Rinomina carico principale" : "Rinomina dispositivo";
+    heading.style.cssText = "font-weight:600;margin-bottom:4px;font-size:14px;";
+    container.appendChild(heading);
+
+    const subheading = document.createElement("div");
+    subheading.textContent = `Nome attuale: ${currentLabel}`;
+    subheading.style.cssText = "font-size:12px;opacity:0.65;margin-bottom:12px;";
+    container.appendChild(subheading);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = currentLabel;
+    input.style.cssText =
+      "width:100%;padding:10px 8px;border-radius:4px;border:1px solid var(--divider-color, #ccc);background:var(--card-background-color, #fff);color:var(--primary-text-color, #000);font-size:14px;box-sizing:border-box;margin-bottom:16px;";
+    container.appendChild(input);
+    // Porta subito il focus sul campo: è l'unica cosa da fare in questa
+    // schermata, ha senso risparmiare un click.
+    setTimeout(() => input.focus(), 0);
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.textContent = "Salva";
+    saveBtn.style.cssText =
+      "padding:8px 18px;border-radius:4px;border:none;background:var(--primary-color, #03a9f4);color:#fff;font-size:14px;font-weight:500;cursor:pointer;";
+    const commit = () => {
+      this._saveRename(group, key, input.value);
+      this._closeRename();
+    };
+    saveBtn.addEventListener("click", commit);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") commit();
+    });
+    container.appendChild(saveBtn);
+  }
+
   // Righe riordinabili via drag, in stile HA nativo: maniglia "☰" a
   // sinistra, contenuto al centro, azioni opzionali a destra. Usata sia
   // per l'elenco dei carichi principali (sola lettura, solo riordino)
@@ -530,10 +642,30 @@ class CasaEnergyCardEditor extends HTMLElement {
     return list;
   }
 
+  // Pulsante "✎" usato su ogni riga per aprire la schermata di rinomina
+  // dedicata. Nativo (non ha-icon-button) per la stessa ragione di
+  // affidabilità cross-versione già discussa per gli altri controlli.
+  _makeRenameBtn(group, key) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "✎";
+    btn.title = "Rinomina";
+    btn.style.cssText =
+      "flex-shrink:0;width:32px;height:32px;border-radius:50%;border:none;background:rgba(127,127,127,0.15);color:var(--primary-text-color, #000);font-size:14px;cursor:pointer;";
+    btn.addEventListener("click", () => this._openRename(group, key));
+    return btn;
+  }
+
   _render() {
     this.innerHTML = "";
     const container = document.createElement("div");
     container.style.padding = "8px";
+
+    if (this._renameTarget) {
+      this._renderRenameScreen(container);
+      this.appendChild(container);
+      return;
+    }
 
     const makeRow = (label, key) => {
       const row = document.createElement("div");
@@ -573,16 +705,21 @@ class CasaEnergyCardEditor extends HTMLElement {
 
       const loadsSubheading = document.createElement("div");
       loadsSubheading.textContent =
-        "Trascina per cambiare l'ordine con cui compaiono in card. Per aggiungere, rimuovere o rinominare un carico, usa Configura sull'integrazione.";
+        "Trascina per cambiare l'ordine con cui compaiono in card. Per aggiungere o rimuovere un carico, usa Configura sull'integrazione.";
       loadsSubheading.style.cssText = "font-size:12px;opacity:0.65;margin-bottom:10px;";
       container.appendChild(loadsSubheading);
 
+      // _applyOrder e la maniglia di drag lavorano sul nome ORIGINALE
+      // (item.name), non sulla label rinominata: così l'ordine salvato
+      // resta valido anche dopo una rinomina, e il pulsante ✎ passa
+      // sempre la chiave corretta a _openRename/_saveRename.
       const orderedLoads = this._applyOrder(mainLoads, "total");
       const loadsList = this._makeSortableList(orderedLoads, "total", (row, item) => {
         const name = document.createElement("span");
-        name.textContent = item.name;
+        name.textContent = this._currentLabel("total", item.name);
         name.style.cssText = "flex:1;font-size:14px;";
         row.appendChild(name);
+        row.appendChild(this._makeRenameBtn("total", item.name));
       });
       container.appendChild(loadsList);
     }
@@ -611,25 +748,14 @@ class CasaEnergyCardEditor extends HTMLElement {
       const findOriginalIndex = () =>
         (this._config.extra_devices || []).findIndex((d) => d === device);
 
-      // Un <input> nativo invece di ha-textfield: quest'ultimo è un
-      // componente interno del frontend HA, non garantito disponibile
-      // né stabile per l'uso da custom card esterne — nel nostro caso
-      // non renderizzava affatto il campo. Uno stile inline lo rende
-      // comunque coerente con l'aspetto dell'editor HA.
-      const nameInput = document.createElement("input");
-      nameInput.type = "text";
-      nameInput.placeholder = "Nome";
-      nameInput.value = device.name || "";
-      nameInput.style.cssText =
-        "flex:1 1 100px;min-width:90px;padding:10px 8px;border-radius:4px;border:1px solid var(--divider-color, #ccc);background:var(--card-background-color, #fff);color:var(--primary-text-color, #000);font-size:14px;box-sizing:border-box;";
-      nameInput.addEventListener("input", (ev) => {
-        const idx = findOriginalIndex();
-        if (idx < 0) return;
-        const updated = [...this._config.extra_devices];
-        updated[idx] = { ...updated[idx], name: ev.target.value };
-        this._config = { ...this._config, extra_devices: updated };
-        this._fireChanged(true);
-      });
+      const nameLabel = document.createElement("span");
+      nameLabel.textContent = device.name || "(senza nome)";
+      nameLabel.style.cssText = "flex:1 1 100px;min-width:80px;font-size:14px;";
+      row.appendChild(nameLabel);
+      // La chiave di rinomina è l'indice nell'array extra_devices (non
+      // il nome): due dispositivi appena aggiunti hanno entrambi nome
+      // vuoto, quindi solo la posizione li distingue in modo univoco.
+      row.appendChild(this._makeRenameBtn("display", findOriginalIndex()));
 
       const entityPicker = document.createElement("ha-entity-picker");
       entityPicker.label = "Sensore potenza";
@@ -648,7 +774,7 @@ class CasaEnergyCardEditor extends HTMLElement {
       });
 
       // Pulsante nativo invece di ha-icon-button, stessa motivazione di
-      // affidabilità cross-versione di nameInput.
+      // affidabilità cross-versione già discussa altrove.
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.textContent = "✕";
@@ -663,7 +789,6 @@ class CasaEnergyCardEditor extends HTMLElement {
         this._fireChanged();
       });
 
-      row.appendChild(nameInput);
       row.appendChild(entityPicker);
       row.appendChild(removeBtn);
     });

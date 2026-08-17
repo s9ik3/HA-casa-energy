@@ -67,6 +67,10 @@ extra_devices:
     entity: sensor.lavastoviglie_power
 ```
 
+### Ordine e rinomina delle chip
+
+Dall'editor della card puoi trascinare (maniglia "☰") sia i carichi principali sia i dispositivi solo-visualizzazione per cambiare l'ordine con cui compaiono. Su ogni riga, il pulsante "✎" apre una schermata dedicata per rinominare quella singola chip: per i carichi principali questo non tocca il nome configurato nell'integrazione, ma sovrascrive solo l'etichetta mostrata in questa card (salvata in `load_labels`); per i dispositivi solo-visualizzazione rinomina direttamente la voce in `extra_devices`.
+
 **Nota**: la registrazione automatica della risorsa Lovelace richiede che il tuo dashboard sia in modalità "storage" (quella di default per la maggior parte delle installazioni). Se usi un dashboard configurato interamente via YAML, l'auto-registrazione potrebbe non riuscire — in quel caso un messaggio nei log ti dice di aggiungere la risorsa manualmente (Impostazioni → Dashboard → Risorse → URL `/casa_energy_static/casa-energy-card.js`, tipo Modulo JavaScript). L'integrazione resta comunque pienamente funzionante in ogni caso: solo il passaggio automatico della card potrebbe richiedere un piccolo intervento manuale su questo tipo di setup.
 
 Se configuri più istanze (es. Casa e Ufficio), la card viene registrata una sola volta e rimane disponibile per tutte; viene rimossa solo quando **l'ultima** istanza viene disinstallata.
