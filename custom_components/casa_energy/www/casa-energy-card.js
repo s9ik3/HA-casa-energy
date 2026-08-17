@@ -515,18 +515,22 @@ class CasaEnergyCardEditor extends HTMLElement {
     return device ? device.name || "" : "";
   }
 
-  _saveRename(group, key, newLabel) {
+  _saveRename(group, key, newLabel, newEntity) {
     const trimmed = (newLabel || "").trim();
-    if (!trimmed) return;
 
     if (group === "total") {
+      if (!trimmed) return;
       const labels = { ...((this._config && this._config.load_labels) || {}) };
       labels[key] = trimmed;
       this._config = { ...this._config, load_labels: labels };
     } else {
       const devices = [...(this._config.extra_devices || [])];
       if (devices[key]) {
-        devices[key] = { ...devices[key], name: trimmed };
+        devices[key] = {
+          ...devices[key],
+          name: trimmed,
+          ...(newEntity !== undefined ? { entity: newEntity } : {}),
+        };
         this._config = { ...this._config, extra_devices: devices };
       }
     }
@@ -540,6 +544,8 @@ class CasaEnergyCardEditor extends HTMLElement {
   _renderRenameScreen(container) {
     const { group, key } = this._renameTarget;
     const currentLabel = this._currentLabel(group, key);
+    const currentEntity =
+      group === "display" ? ((this._config.extra_devices || [])[key]?.entity || "") : null;
 
     const backRow = document.createElement("div");
     backRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:16px;";
@@ -554,24 +560,42 @@ class CasaEnergyCardEditor extends HTMLElement {
 
     const heading = document.createElement("div");
     heading.textContent =
-      group === "total" ? "Rinomina carico principale" : "Rinomina dispositivo";
+      group === "total" ? "Rinomina carico principale" : "Modifica dispositivo";
     heading.style.cssText = "font-weight:600;margin-bottom:4px;font-size:14px;";
     container.appendChild(heading);
 
     const subheading = document.createElement("div");
-    subheading.textContent = `Nome attuale: ${currentLabel}`;
+    subheading.textContent =
+      group === "total"
+        ? `Nome attuale: ${currentLabel}`
+        : "Nome e sensore di potenza abbinato.";
     subheading.style.cssText = "font-size:12px;opacity:0.65;margin-bottom:12px;";
     container.appendChild(subheading);
 
     const input = document.createElement("input");
     input.type = "text";
-    input.value = currentLabel;
+    input.placeholder = "Nome";
+    input.value = currentLabel === "(senza nome)" ? "" : currentLabel;
     input.style.cssText =
-      "width:100%;padding:10px 8px;border-radius:4px;border:1px solid var(--divider-color, #ccc);background:var(--card-background-color, #fff);color:var(--primary-text-color, #000);font-size:14px;box-sizing:border-box;margin-bottom:16px;";
+      "width:100%;padding:10px 8px;border-radius:4px;border:1px solid var(--divider-color, #ccc);background:var(--card-background-color, #fff);color:var(--primary-text-color, #000);font-size:14px;box-sizing:border-box;margin-bottom:12px;";
     container.appendChild(input);
-    // Porta subito il focus sul campo: è l'unica cosa da fare in questa
-    // schermata, ha senso risparmiare un click.
+    // Porta subito il focus sul campo: nel caso più comune (solo
+    // rinomina) è l'unica cosa da fare, ha senso risparmiare un click.
     setTimeout(() => input.focus(), 0);
+
+    // Il sensore di potenza si modifica solo qui per i dispositivi
+    // extra: nella lista la riga mostra solo nome + azioni, per lo
+    // stesso layout minimale dei carichi principali.
+    let entityPicker = null;
+    if (group === "display") {
+      entityPicker = document.createElement("ha-entity-picker");
+      entityPicker.label = "Sensore potenza";
+      entityPicker.value = currentEntity || "";
+      entityPicker.includeDomains = ["sensor"];
+      if (this._hass) entityPicker.hass = this._hass;
+      entityPicker.style.cssText = "width:100%;margin-bottom:16px;display:block;";
+      container.appendChild(entityPicker);
+    }
 
     const saveBtn = document.createElement("button");
     saveBtn.type = "button";
@@ -579,7 +603,8 @@ class CasaEnergyCardEditor extends HTMLElement {
     saveBtn.style.cssText =
       "padding:8px 18px;border-radius:4px;border:none;background:var(--primary-color, #03a9f4);color:#fff;font-size:14px;font-weight:500;cursor:pointer;";
     const commit = () => {
-      this._saveRename(group, key, input.value);
+      const entityValue = entityPicker ? entityPicker.value : undefined;
+      this._saveRename(group, key, input.value, entityValue);
       this._closeRename();
     };
     saveBtn.addEventListener("click", commit);
@@ -750,37 +775,26 @@ class CasaEnergyCardEditor extends HTMLElement {
 
       const nameLabel = document.createElement("span");
       nameLabel.textContent = device.name || "(senza nome)";
-      nameLabel.style.cssText = "flex:1 1 100px;min-width:80px;font-size:14px;";
+      nameLabel.style.cssText = "flex:1;font-size:14px;";
       row.appendChild(nameLabel);
       // La chiave di rinomina è l'indice nell'array extra_devices (non
       // il nome): due dispositivi appena aggiunti hanno entrambi nome
       // vuoto, quindi solo la posizione li distingue in modo univoco.
+      // La schermata di rinomina gestisce anche il sensore abbinato, non
+      // solo il nome: stesso pulsante ✎, stessa forma della lista, ma il
+      // contenuto della schermata si adatta al gruppo "display".
       row.appendChild(this._makeRenameBtn("display", findOriginalIndex()));
 
-      const entityPicker = document.createElement("ha-entity-picker");
-      entityPicker.label = "Sensore potenza";
-      entityPicker.value = device.entity || "";
-      entityPicker.includeDomains = ["sensor"];
-      if (this._hass) entityPicker.hass = this._hass;
-      entityPicker.style.cssText = "flex:2 1 180px;min-width:160px;";
-      entityPicker.addEventListener("value-changed", (ev) => {
-        ev.stopPropagation();
-        const idx = findOriginalIndex();
-        if (idx < 0) return;
-        const updated = [...this._config.extra_devices];
-        updated[idx] = { ...updated[idx], entity: ev.detail.value };
-        this._config = { ...this._config, extra_devices: updated };
-        this._fireChanged();
-      });
-
       // Pulsante nativo invece di ha-icon-button, stessa motivazione di
-      // affidabilità cross-versione già discussa altrove.
+      // affidabilità cross-versione già discussa altrove. Resta sulla
+      // riga (non nella schermata di rinomina) perché rimuovere è
+      // un'azione distruttiva e immediata, diversa dal modificare.
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
       removeBtn.textContent = "✕";
       removeBtn.title = "Rimuovi dispositivo";
       removeBtn.style.cssText =
-        "flex-shrink:0;width:36px;height:36px;border-radius:50%;border:none;background:rgba(127,127,127,0.15);color:var(--primary-text-color, #000);font-size:14px;cursor:pointer;";
+        "flex-shrink:0;width:32px;height:32px;border-radius:50%;border:none;background:rgba(127,127,127,0.15);color:var(--primary-text-color, #000);font-size:14px;cursor:pointer;";
       removeBtn.addEventListener("click", () => {
         const idx = findOriginalIndex();
         if (idx < 0) return;
@@ -789,7 +803,6 @@ class CasaEnergyCardEditor extends HTMLElement {
         this._fireChanged();
       });
 
-      row.appendChild(entityPicker);
       row.appendChild(removeBtn);
     });
 

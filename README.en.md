@@ -69,7 +69,7 @@ extra_devices:
 
 ### Reordering and renaming chips
 
-From the card's editor you can drag (handle "☰") both the main loads and the display-only devices to change the order they appear in. On each row, the "✎" button opens a dedicated screen to rename that single chip: for main loads this doesn't touch the name configured in the integration, it only overrides the label shown in this card (saved in `load_labels`); for display-only devices it renames the entry in `extra_devices` directly.
+From the card's editor you can drag (handle "☰") both the main loads and the display-only devices to change the order they appear in. On each row, the "✎" button opens a dedicated screen: for main loads it lets you rename the chip without touching the name configured in the integration (the custom label is saved in `load_labels`); for display-only devices it lets you edit both the name and the matched power sensor, saving directly to `extra_devices`. The "✕" button to remove a device stays visible directly on the row.
 
 **Note**: automatic Lovelace resource registration requires your dashboard to be in "storage" mode (the default for most installations). If you use a fully YAML-configured dashboard, auto-registration may not succeed — in that case a log message tells you to add the resource manually (Settings → Dashboards → Resources → URL `/casa_energy_static/casa-energy-card.js`, type JavaScript module). The integration remains fully functional either way: only the automatic card step might need a small manual step on this kind of setup.
 
