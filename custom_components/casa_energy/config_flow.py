@@ -340,6 +340,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         self._match_ambiguous: list[tuple[str, dict]] = []
         self._match_unmatched: dict[str, str] = {}
         self._confirm_queue: list[str] | None = None
+        self._rename_display_queue: list[int] | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -442,46 +443,76 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
     async def async_step_manage_display_loads(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Mostra i dispositivi 'solo visualizzazione' già configurati con
-        opzione di rinomina e rimozione, e permette di aggiungerne di
-        nuovi. La lista può restare vuota: questi dispositivi non entrano
-        nel calcolo del totale, servono solo per mostrarli come chip
-        separati in card."""
+        """Mostra i dispositivi 'solo visualizzazione' già configurati e
+        permette di rimuoverli. La rinomina avviene nello step successivo
+        (uno per dispositivo, con l'entità sorgente mostrata come
+        contesto): con più dispositivi, campi tipo 'rename_0'/'rename_1'
+        senza indicazione di quale entità rappresentano rendono
+        impossibile capire quale si sta modificando. La lista può restare
+        vuota: questi dispositivi non entrano nel calcolo del totale,
+        servono solo per mostrarli come chip separati in card."""
         current: list[dict] = list(self._data.get(CONF_DISPLAY_LOADS, []))
 
         if user_input is not None:
             remove_names = set(user_input.get("remove_display_loads", []))
-            updated = []
-            for i, d in enumerate(current):
-                if d[CONF_LOAD_NAME] in remove_names:
-                    continue
-                new_name = user_input.get(f"rename_{i}", "").strip()
-                updated.append(
-                    {
-                        CONF_LOAD_NAME: new_name or d[CONF_LOAD_NAME],
-                        CONF_LOAD_ENTITY: d[CONF_LOAD_ENTITY],
-                    }
-                )
-            self._data[CONF_DISPLAY_LOADS] = updated
-            if user_input.get("add_more"):
-                return await self.async_step_add_display_load_option()
-            return self.async_create_entry(title="", data=self._data)
+            self._data[CONF_DISPLAY_LOADS] = [
+                d for d in current if d[CONF_LOAD_NAME] not in remove_names
+            ]
+            self._data["_add_more_display_loads"] = bool(user_input.get("add_more"))
+            self._rename_display_queue = None
+            return await self.async_step_rename_display_loads()
 
         if not current:
             return await self.async_step_add_display_load_option()
 
         options = [d[CONF_LOAD_NAME] for d in current]
-        schema_dict: dict[Any, Any] = {}
-        for i, d in enumerate(current):
-            schema_dict[vol.Optional(f"rename_{i}", default=d[CONF_LOAD_NAME])] = str
-        schema_dict[
-            vol.Optional("remove_display_loads", default=[])
-        ] = selector.SelectSelector(
-            selector.SelectSelectorConfig(options=options, multiple=True, mode="list")
+        schema = vol.Schema(
+            {
+                vol.Optional("remove_display_loads", default=[]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=options, multiple=True, mode="list")
+                ),
+                vol.Optional("add_more", default=False): bool,
+            }
         )
-        schema_dict[vol.Optional("add_more", default=False)] = bool
-        schema = vol.Schema(schema_dict)
         return self.async_show_form(step_id="manage_display_loads", data_schema=schema)
+
+    # ---------- Rinomina, un dispositivo alla volta (post-rimozione) ----------
+    async def async_step_rename_display_loads(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Chiede il nome di ciascun dispositivo solo-visualizzazione
+        rimasto dopo l'eventuale rimozione, uno alla volta, mostrando
+        l'entità sorgente come contesto in modo che sia sempre chiaro
+        quale dispositivo si sta rinominando."""
+        current: list[dict] = self._data.get(CONF_DISPLAY_LOADS, [])
+
+        if self._rename_display_queue is None:
+            self._rename_display_queue = list(range(len(current)))
+
+        if user_input is not None and self._rename_display_queue:
+            idx = self._rename_display_queue.pop(0)
+            new_name = user_input.get(CONF_LOAD_NAME, "").strip()
+            if new_name:
+                current[idx][CONF_LOAD_NAME] = new_name
+
+        if not self._rename_display_queue:
+            self._rename_display_queue = None
+            if self._data.pop("_add_more_display_loads", False):
+                return await self.async_step_add_display_load_option()
+            return self.async_create_entry(title="", data=self._data)
+
+        idx = self._rename_display_queue[0]
+        d = current[idx]
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_LOAD_NAME, default=d[CONF_LOAD_NAME]): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="rename_display_loads",
+            data_schema=schema,
+            description_placeholders={"entity": d[CONF_LOAD_ENTITY]},
+        )
 
     async def async_step_add_display_load_option(
         self, user_input: dict[str, Any] | None = None

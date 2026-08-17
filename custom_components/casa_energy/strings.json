@@ -126,10 +126,17 @@
       },
       "manage_display_loads": {
         "title": "Gestisci dispositivi solo visualizzazione",
-        "description": "Questi dispositivi vengono mostrati come voce a parte in card, ma NON entrano nel calcolo del totale. Seleziona quelli da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi.",
+        "description": "Questi dispositivi vengono mostrati come voce a parte in card, ma NON entrano nel calcolo del totale. Seleziona quelli da rimuovere, oppure spunta 'Aggiungi altri' per aggiungerne di nuovi. La rinomina avviene nel passaggio successivo, un dispositivo alla volta.",
         "data": {
           "remove_display_loads": "Rimuovi dispositivi",
           "add_more": "Aggiungi altri dispositivi"
+        }
+      },
+      "rename_display_loads": {
+        "title": "Nome del dispositivo",
+        "description": "Sensore: {entity}\n\nScegli il nome con cui mostrare questo dispositivo nella card (puoi lasciare il nome attuale).",
+        "data": {
+          "name": "Nome dispositivo"
         }
       },
       "add_display_load_option": {
