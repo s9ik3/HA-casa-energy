@@ -28,6 +28,9 @@ CONF_LOAD_ENERGY_ENTITY = "energy_entity"  # sensore energy da cui questo carico
 # che quel carico non venga conteggiato nella potenza istantanea) ---
 CONF_IGNORE_UNMATCHED = "ignore_unmatched_power"
 
+# --- Reset delle tariffe congelate sui mesi già chiusi (Opzioni → Tariffa) ---
+CONF_RESET_FROZEN_TARIFFS = "reset_frozen_tariffs"
+
 # --- Nome istanza (per supportare più config entry, es. Casa / Ufficio) ---
 CONF_INSTANCE_NAME = "instance_name"
 

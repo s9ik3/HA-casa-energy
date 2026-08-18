@@ -157,6 +157,7 @@ class CasaEnergyCard extends HTMLElement {
             color: #42a5f5;
             text-align: right;
             line-height: 1;
+            white-space: nowrap;
           }
           .cec-month-cost {
             font-size: 11px;
@@ -164,6 +165,7 @@ class CasaEnergyCard extends HTMLElement {
             color: var(--secondary-text-color);
             text-align: right;
             margin-top: 2px;
+            white-space: nowrap;
           }
           .cec-month-bar-track {
             height: 6px;
@@ -182,9 +184,10 @@ class CasaEnergyCard extends HTMLElement {
             display: flex;
             align-items: center;
             gap: 4px;
-            font-size: 12px;
-            opacity: 0.7;
-            margin-top: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--secondary-text-color);
+            margin-top: 8px;
             cursor: pointer;
           }
           .cec-history {
@@ -261,7 +264,7 @@ class CasaEnergyCard extends HTMLElement {
               <ha-icon icon="mdi:calendar-month" style="--mdc-icon-size:16px;"></ha-icon>
               Mese corrente
             </div>
-            <div>
+            <div style="text-align:right;">
               <div class="cec-month-kwh" id="cec-month-kwh">-- kWh</div>
               <div class="cec-month-cost" id="cec-month-cost"></div>
             </div>

@@ -25,6 +25,7 @@ from .const import (
     UPDATE_INTERVAL_MINUTES,
 )
 from .device_matching import resolve_power_sensors
+from .tariff_history import FrozenTariffStore, tariff_from_entry_data, tariffs_differ
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -274,6 +275,7 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(minutes=UPDATE_INTERVAL_MINUTES),
         )
         self.entry = entry
+        self.frozen_tariffs = FrozenTariffStore(hass, entry.entry_id)
 
     async def _async_update_data(self) -> dict:
         from homeassistant.components.recorder import get_instance
@@ -286,10 +288,11 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
         if not energy_sensors:
             return {"mesi": []}
 
-        price = float(data.get(CONF_PRICE_PER_KWH, 0.0))
-        fixed_cost = float(data.get(CONF_FIXED_MONTHLY_COST, 0.0))
-        extra = float(data.get(CONF_EXTRA_CHARGES_PER_KWH, 0.0))
-        vat = float(data.get(CONF_VAT_RATE, 0.0))
+        live_tariff = tariff_from_entry_data(data)
+        # Carica (con cache in memoria dopo la prima volta) le tariffe
+        # congelate sui mesi già chiusi: quei mesi useranno i loro
+        # parametri storici invece di quelli correnti in configurazione.
+        await self.frozen_tariffs.async_load()
 
         # Vai indietro fino a 24 mesi fa (+ margine di un mese per
         # includere per intero il primo mese della finestra) per avere
@@ -372,6 +375,20 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
         for month_key in sorted(monthly_kwh.keys()):
             insufficient = monthly_insufficient.get(month_key, False)
             kwh = round(monthly_kwh[month_key], 2)
+
+            # Mesi già chiusi con una tariffa congelata usano quella,
+            # non i parametri correnti in configurazione: così una
+            # modifica di tariffa non altera retroattivamente il costo
+            # di mesi già "fatturati". Il mese corrente (mai congelato)
+            # e i mesi senza congelamento usano la tariffa live.
+            frozen = self.frozen_tariffs.get_frozen_tariff(month_key)
+            tariff = frozen if frozen is not None else live_tariff
+
+            price = tariff[CONF_PRICE_PER_KWH]
+            extra = tariff[CONF_EXTRA_CHARGES_PER_KWH]
+            fixed_cost = tariff[CONF_FIXED_MONTHLY_COST]
+            vat = tariff[CONF_VAT_RATE]
+
             cost = round((kwh * price) + (kwh * extra) + fixed_cost, 2)
             cost_with_vat = round(cost * (1 + vat / 100), 2)
             months.append(
@@ -380,6 +397,7 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
                     "kwh": kwh,
                     "costo": cost_with_vat,
                     "insufficient_data": insufficient,
+                    "tariffa_congelata": frozen is not None,
                 }
             )
 

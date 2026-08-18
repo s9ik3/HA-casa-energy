@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime
 from typing import Any
 
 import voluptuous as vol
@@ -23,6 +24,7 @@ from .const import (
     CONF_LOADS,
     CONF_MAX_POWER,
     CONF_PRICE_PER_KWH,
+    CONF_RESET_FROZEN_TARIFFS,
     CONF_VAT_RATE,
     CONF_WARNING_THRESHOLD_PCT,
     DEFAULT_CRITICAL_THRESHOLD_PCT,
@@ -32,6 +34,7 @@ from .const import (
     DOMAIN,
 )
 from .device_matching import resolve_power_sensors
+from .tariff_history import FrozenTariffStore, tariff_from_entry_data, tariffs_differ
 
 ENERGY_SENSOR_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="energy", multiple=True)
@@ -311,7 +314,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         return await self.async_step_energy_sensors()
 
-    def _async_save_and_finish(self) -> config_entries.ConfigFlowResult:
+    async def _async_save_and_finish(self) -> config_entries.ConfigFlowResult:
         """Salva le modifiche in entry.data (dove sensor.py e __init__.py
         le leggono davvero) e chiude il flow. Fondamentale: chiamare
         self.async_create_entry(data=...) qui scriverebbe in entry.options
@@ -320,7 +323,29 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         i valori vecchi nonostante il flow segnali un salvataggio riuscito.
         async_update_entry() aggiorna esplicitamente entry.data; il
         confronto con i dati precedenti fa scattare l'update_listener
-        (già registrato in __init__.py) che ricarica l'integrazione."""
+        (già registrato in __init__.py) che ricarica l'integrazione.
+
+        Prima del salvataggio, se la tariffa è cambiata rispetto a quella
+        finora in vigore (self._config_entry.data contiene ancora i
+        valori vecchi in questo momento), congela quella vecchia tariffa
+        su tutti i mesi già chiusi: da qui in poi quei mesi non seguiranno
+        più eventuali modifiche future, restando fissi a quanto erano
+        stati fatturati davvero."""
+        old_tariff = tariff_from_entry_data(self._config_entry.data)
+        new_tariff = tariff_from_entry_data(self._data)
+
+        if self._data.pop(CONF_RESET_FROZEN_TARIFFS, False):
+            store = FrozenTariffStore(self.hass, self._config_entry.entry_id)
+            await store.async_reset()
+        elif tariffs_differ(old_tariff, new_tariff):
+            store = FrozenTariffStore(self.hass, self._config_entry.entry_id)
+            coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+            mesi = (coordinator.data or {}).get("mesi", []) if coordinator else []
+            now = datetime.now()
+            current_month_key = f"{now.year}-{now.month:02d}"
+            closed_months = [m["mese"] for m in mesi if m["mese"] != current_month_key]
+            await store.async_freeze_previous_tariff(closed_months, old_tariff)
+
         self.hass.config_entries.async_update_entry(self._config_entry, data=self._data)
         return self.async_create_entry(title="", data={})
 
@@ -383,6 +408,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
                 vol.Required(
                     CONF_VAT_RATE, default=self._data.get(CONF_VAT_RATE, DEFAULT_VAT_RATE)
                 ): vol.Coerce(float),
+                vol.Optional(CONF_RESET_FROZEN_TARIFFS, default=False): bool,
             }
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
@@ -440,7 +466,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
 
         if not self._rename_loads_queue:
             self._rename_loads_queue = None
-            return self._async_save_and_finish()
+            return await self._async_save_and_finish()
 
         idx = self._rename_loads_queue[0]
         d = current[idx]

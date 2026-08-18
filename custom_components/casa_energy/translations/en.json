@@ -99,11 +99,13 @@
       },
       "tariff": {
         "title": "Electricity tariff",
+        "description": "If you change the price, fixed costs, extra fees, or tax rate, the new value applies from the 1st of the current month onward. Already-closed months stay fixed at the tariff they were calculated with, and won't change again even if you modify these values later.",
         "data": {
           "price_per_kwh": "Energy price (per kWh)",
           "fixed_monthly_cost": "Fixed monthly costs",
           "extra_charges_per_kwh": "Extra fees/taxes (per kWh, optional)",
-          "vat_rate": "Tax rate (%)"
+          "vat_rate": "Tax rate (%)",
+          "reset_frozen_tariffs": "Reset frozen tariffs (recalculate all past months with the tariff above)"
         }
       },
       "power": {

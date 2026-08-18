@@ -99,11 +99,13 @@
       },
       "tariff": {
         "title": "Tariffa elettrica",
+        "description": "Se modifichi prezzo, costi fissi, oneri o IVA, il nuovo valore si applica dal 1° del mese corrente in poi. I mesi già chiusi restano fissi alla tariffa con cui erano stati calcolati, e non cambiano più anche se in futuro modifichi di nuovo questi valori.",
         "data": {
           "price_per_kwh": "Prezzo energia (per kWh)",
           "fixed_monthly_cost": "Costi fissi mensili",
           "extra_charges_per_kwh": "Oneri/accise aggiuntivi (per kWh, opzionale)",
-          "vat_rate": "Aliquota IVA (%)"
+          "vat_rate": "Aliquota IVA (%)",
+          "reset_frozen_tariffs": "Reset tariffe congelate (ricalcola tutti i mesi passati con la tariffa qui sopra)"
         }
       },
       "power": {
