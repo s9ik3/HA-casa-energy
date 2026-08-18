@@ -89,8 +89,9 @@ I quattro valori base vanno inseriti così come sono (con il punto) nello step "
 Se la tua bolletta ha una struttura più complessa dei quattro campi semplici (più oneri distinti, componenti stagionali, importi non soggetti a IVA, ecc.), dallo step "Tariffa" delle Opzioni puoi spuntare "Gestisci voci di tariffa avanzate" per aggiungerne quante ne servono. Ogni voce ha:
 
 - **Nome** libero (es. "Oneri di sistema", "Contributo stagionale")
-- **Tipo**: *per kWh consumato* (moltiplicato per i kWh del mese) oppure *importo fisso mensile*
+- **Tipo**: *per kWh consumato* (moltiplicato per i kWh del mese), *importo fisso mensile*, oppure *per kW di potenza impegnata* (moltiplicato per la potenza del contratto, non per il consumo — utile per componenti come la quota potenza del trasporto, che in bolletta sono calcolate sui kW e non sui kWh)
 - **Valore**: può essere negativo, per rappresentare una detrazione/credito
+- **Potenza impegnata in kW**: richiesta solo per il tipo "per kW di potenza impegnata"
 - **Applica IVA**: se disattivato, quella voce si somma al costo finale senza subire l'aliquota IVA configurata sopra
 - **Range di mesi** (opzionale): per voci stagionali, es. da 1 a 10 per "gennaio-ottobre"; lasciato vuoto si applica tutto l'anno
 

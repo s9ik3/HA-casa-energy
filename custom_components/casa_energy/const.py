@@ -17,13 +17,18 @@ CONF_VAT_RATE = "vat_rate"
 # quattro campi semplici sopra, non li sostituiscono. ---
 CONF_TARIFF_LINE_ITEMS = "tariff_line_items"
 CONF_LINE_ITEM_NAME = "name"
-CONF_LINE_ITEM_TYPE = "type"  # "per_kwh" oppure "fixed"
+CONF_LINE_ITEM_TYPE = "type"  # "per_kwh", "fixed", oppure "per_kw_power"
 CONF_LINE_ITEM_VALUE = "value"
 CONF_LINE_ITEM_APPLY_VAT = "apply_vat"
 CONF_LINE_ITEM_MONTH_FROM = "month_from"  # 1-12, opzionale (assente = tutto l'anno)
 CONF_LINE_ITEM_MONTH_TO = "month_to"  # 1-12, opzionale
+# Potenza impegnata in kW, richiesta solo per le voci di tipo per_kw_power
+# (es. quota potenza del trasporto, calcolata sui kW del contratto e non
+# sui kWh consumati nel mese).
+CONF_LINE_ITEM_ENGAGED_POWER_KW = "engaged_power_kw"
 LINE_ITEM_TYPE_PER_KWH = "per_kwh"
 LINE_ITEM_TYPE_FIXED = "fixed"
+LINE_ITEM_TYPE_PER_KW_POWER = "per_kw_power"
 
 # --- Step 3: potenza istantanea ---
 CONF_TOTAL_POWER_SENSOR = "total_power_sensor"

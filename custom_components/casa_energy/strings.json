@@ -119,11 +119,12 @@
       },
       "edit_line_item": {
         "title": "Nuova voce di tariffa",
-        "description": "Nome libero (es. 'Oneri di sistema', 'Contributo stagionale'). Tipo: 'Per kWh consumato' moltiplica il valore per i kWh del mese; 'Importo fisso mensile' si applica una volta a prescindere dal consumo. Il range di mesi è opzionale: lascialo vuoto per applicare la voce tutto l'anno, oppure impostalo per voci stagionali (es. da 1 a 10 per gennaio-ottobre).",
+        "description": "Nome libero (es. 'Oneri di sistema', 'Contributo stagionale'). Tipo: 'Per kWh consumato' moltiplica il valore per i kWh del mese; 'Importo fisso mensile' si applica una volta a prescindere dal consumo; 'Per kW di potenza impegnata' moltiplica il valore per la potenza in kW indicata sotto (per componenti calcolate sulla potenza del contratto, non sul consumo). Il range di mesi è opzionale: lascialo vuoto per applicare la voce tutto l'anno, oppure impostalo per voci stagionali (es. da 1 a 10 per gennaio-ottobre).",
         "data": {
           "name": "Nome voce",
           "type": "Tipo",
           "value": "Valore (può essere negativo per una detrazione)",
+          "engaged_power_kw": "Potenza impegnata in kW (solo per il tipo 'per kW di potenza')",
           "apply_vat": "Applica l'IVA configurata sopra a questa voce",
           "month_from": "Mese iniziale (1-12, opzionale)",
           "month_to": "Mese finale (1-12, opzionale)",
@@ -151,7 +152,8 @@
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
       "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
       "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista.",
-      "line_item_name_required": "Dai un nome alla voce di tariffa."
+      "line_item_name_required": "Dai un nome alla voce di tariffa.",
+      "engaged_power_required": "Indica la potenza impegnata in kW per questo tipo di voce."
     }
   }
 }

@@ -19,6 +19,7 @@ from .const import (
     CONF_IGNORE_UNMATCHED,
     CONF_INSTANCE_NAME,
     CONF_LINE_ITEM_APPLY_VAT,
+    CONF_LINE_ITEM_ENGAGED_POWER_KW,
     CONF_LINE_ITEM_MONTH_FROM,
     CONF_LINE_ITEM_MONTH_TO,
     CONF_LINE_ITEM_NAME,
@@ -40,6 +41,7 @@ from .const import (
     DEFAULT_WARNING_THRESHOLD_PCT,
     DOMAIN,
     LINE_ITEM_TYPE_FIXED,
+    LINE_ITEM_TYPE_PER_KW_POWER,
     LINE_ITEM_TYPE_PER_KWH,
 )
 from .device_matching import resolve_power_sensors
@@ -469,23 +471,33 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
     async def async_step_edit_line_item(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Aggiunge una nuova voce di tariffa avanzata. Nome, tipo
-        (per kWh o fissa mensile), valore, se applicarci sopra l'IVA, e
-        un range di mesi opzionale per voci stagionali."""
+        """Aggiunge una nuova voce di tariffa avanzata. Nome, tipo (per
+        kWh, fissa mensile, o per kW di potenza impegnata), valore, se
+        applicarci sopra l'IVA, e un range di mesi opzionale per voci
+        stagionali."""
         errors: dict[str, str] = {}
         if user_input is not None:
             name = user_input.get(CONF_LINE_ITEM_NAME, "").strip()
+            item_type = user_input.get(CONF_LINE_ITEM_TYPE)
             if not name:
                 errors["base"] = "line_item_name_required"
+            elif item_type == LINE_ITEM_TYPE_PER_KW_POWER and not user_input.get(
+                CONF_LINE_ITEM_ENGAGED_POWER_KW
+            ):
+                errors["base"] = "engaged_power_required"
             else:
                 month_from = user_input.get(CONF_LINE_ITEM_MONTH_FROM) or None
                 month_to = user_input.get(CONF_LINE_ITEM_MONTH_TO) or None
                 new_item = {
                     CONF_LINE_ITEM_NAME: name,
-                    CONF_LINE_ITEM_TYPE: user_input[CONF_LINE_ITEM_TYPE],
+                    CONF_LINE_ITEM_TYPE: item_type,
                     CONF_LINE_ITEM_VALUE: user_input[CONF_LINE_ITEM_VALUE],
                     CONF_LINE_ITEM_APPLY_VAT: user_input.get(CONF_LINE_ITEM_APPLY_VAT, True),
                 }
+                if item_type == LINE_ITEM_TYPE_PER_KW_POWER:
+                    new_item[CONF_LINE_ITEM_ENGAGED_POWER_KW] = user_input[
+                        CONF_LINE_ITEM_ENGAGED_POWER_KW
+                    ]
                 if month_from:
                     new_item[CONF_LINE_ITEM_MONTH_FROM] = int(month_from)
                 if month_to:
@@ -505,9 +517,13 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
                     {
                         LINE_ITEM_TYPE_PER_KWH: "Per kWh consumato",
                         LINE_ITEM_TYPE_FIXED: "Importo fisso mensile",
+                        LINE_ITEM_TYPE_PER_KW_POWER: "Per kW di potenza impegnata",
                     }
                 ),
                 vol.Required(CONF_LINE_ITEM_VALUE, default=0.0): vol.Coerce(float),
+                vol.Optional(CONF_LINE_ITEM_ENGAGED_POWER_KW, default=0.0): vol.Coerce(
+                    float
+                ),
                 vol.Optional(CONF_LINE_ITEM_APPLY_VAT, default=True): bool,
                 vol.Optional(CONF_LINE_ITEM_MONTH_FROM): vol.All(
                     vol.Coerce(int), vol.Range(min=1, max=12)

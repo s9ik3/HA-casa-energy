@@ -22,6 +22,7 @@ from .const import (
     CONF_EXTRA_CHARGES_PER_KWH,
     CONF_FIXED_MONTHLY_COST,
     CONF_LINE_ITEM_APPLY_VAT,
+    CONF_LINE_ITEM_ENGAGED_POWER_KW,
     CONF_LINE_ITEM_MONTH_FROM,
     CONF_LINE_ITEM_MONTH_TO,
     CONF_LINE_ITEM_TYPE,
@@ -29,6 +30,7 @@ from .const import (
     CONF_PRICE_PER_KWH,
     CONF_TARIFF_LINE_ITEMS,
     CONF_VAT_RATE,
+    LINE_ITEM_TYPE_PER_KW_POWER,
     LINE_ITEM_TYPE_PER_KWH,
 )
 
@@ -131,11 +133,13 @@ def calculate_cost(kwh: float, month_key: str, tariff: dict) -> float:
     calcolo di base, sempre soggetti a IVA — esattamente come prima
     dell'introduzione delle voci extra, per compatibilità con chi non le
     usa. Le voci extra (tariff_line_items) si sommano al subtotale
-    ciascuna secondo il proprio tipo (per kWh o fissa mensile), il
-    proprio range di mesi applicabile, e la propria scelta se applicarci
-    sopra l'IVA oppure no — necessario perché in bolletta capita di avere
-    voci non soggette a IVA (es. un contributo una tantum) mescolate a
-    voci che invece lo sono."""
+    ciascuna secondo il proprio tipo (per kWh, fissa mensile, o per kW di
+    potenza impegnata — quest'ultima per componenti calcolate sulla
+    potenza del contratto anziché sul consumo, come la quota potenza del
+    trasporto), il proprio range di mesi applicabile, e la propria scelta
+    se applicarci sopra l'IVA oppure no — necessario perché in bolletta
+    capita di avere voci non soggette a IVA (es. un contributo una
+    tantum) mescolate a voci che invece lo sono."""
     price = tariff.get(CONF_PRICE_PER_KWH, 0.0)
     fixed_cost = tariff.get(CONF_FIXED_MONTHLY_COST, 0.0)
     extra = tariff.get(CONF_EXTRA_CHARGES_PER_KWH, 0.0)
@@ -162,7 +166,14 @@ def calculate_cost(kwh: float, month_key: str, tariff: dict) -> float:
                 continue
 
         value = float(item.get(CONF_LINE_ITEM_VALUE, 0.0))
-        amount = value * kwh if item.get(CONF_LINE_ITEM_TYPE) == LINE_ITEM_TYPE_PER_KWH else value
+        item_type = item.get(CONF_LINE_ITEM_TYPE)
+        if item_type == LINE_ITEM_TYPE_PER_KWH:
+            amount = value * kwh
+        elif item_type == LINE_ITEM_TYPE_PER_KW_POWER:
+            engaged_power = float(item.get(CONF_LINE_ITEM_ENGAGED_POWER_KW, 0.0))
+            amount = value * engaged_power
+        else:
+            amount = value
 
         if item.get(CONF_LINE_ITEM_APPLY_VAT, True):
             vat_taxable_extra += amount

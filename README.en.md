@@ -88,8 +88,9 @@ The four base values should be entered as-is (with a dot) in the "Tariff" config
 If your bill has a more complex structure than the four simple fields (several distinct fees, seasonal components, amounts not subject to tax, etc.), from the "Tariff" step in the Options you can check "Manage advanced tariff line items" to add as many as you need. Each item has:
 
 - A free-form **name** (e.g. "System charges", "Seasonal contribution")
-- A **type**: *per kWh consumed* (multiplied by the month's kWh) or *fixed monthly amount*
+- A **type**: *per kWh consumed* (multiplied by the month's kWh), *fixed monthly amount*, or *per kW of engaged power* (multiplied by the contract's power, not consumption — useful for components like the transport capacity charge, which on bills are calculated on kW rather than kWh)
 - A **value**, which can be negative to represent a deduction/credit
+- **Engaged power in kW**: required only for the "per kW of engaged power" type
 - **Apply tax**: if disabled, that item is added to the final cost without the configured tax rate applied to it
 - An optional **month range**: for seasonal items, e.g. 1 to 10 for "January-October"; left empty it applies year-round
 
