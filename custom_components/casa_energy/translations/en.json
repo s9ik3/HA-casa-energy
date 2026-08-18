@@ -110,25 +110,10 @@
         }
       },
       "manage_line_items": {
-        "title": "Advanced tariff line items ({count} present)",
-        "description": "These items are added on top of the four fields above: use them for distinct extra fees, seasonal components (e.g. active only in certain months), or amounts not subject to tax. Select any to remove, or check 'Add a new item' to create one.",
+        "title": "Advanced tariff line items",
+        "description": "Paste all your items here as YAML, a list with one block per item. Fields for each item: name (free-form), type (per_kwh, fixed, or per_kw_power), value (a number, can be negative for a deduction), apply_vat (true/false, optional, defaults to true), engaged_power_kw (required only for type per_kw_power), month_from and month_to (1-12, optional, for seasonal items). Leave the field empty to have no advanced items. Example:\n\n{example}\n\n{error_detail}",
         "data": {
-          "remove_line_items": "Remove items",
-          "add_new": "Add a new item"
-        }
-      },
-      "edit_line_item": {
-        "title": "New tariff line item",
-        "description": "Free-form name (e.g. 'System charges', 'Seasonal contribution'). Type: 'Per kWh consumed' multiplies the value by the month's kWh; 'Fixed monthly amount' applies once regardless of consumption; 'Per kW of engaged power' multiplies the value by the power in kW entered below (for components calculated on the contract's power rather than consumption). The month range is optional: leave it empty to apply the item year-round, or set it for seasonal items (e.g. 1 to 10 for January-October).",
-        "data": {
-          "name": "Item name",
-          "type": "Type",
-          "value": "Value (can be negative for a deduction)",
-          "engaged_power_kw": "Engaged power in kW (only for the 'per kW of power' type)",
-          "apply_vat": "Apply the tax rate configured above to this item",
-          "month_from": "Start month (1-12, optional)",
-          "month_to": "End month (1-12, optional)",
-          "add_another": "Add another item after this one"
+          "line_items_yaml": "Tariff line items (YAML)"
         }
       },
       "power": {
@@ -152,8 +137,7 @@
       "no_energy_sensors": "Select at least one energy sensor.",
       "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
       "duplicate_entity": "This sensor has already been added to this list.",
-      "line_item_name_required": "Give the tariff line item a name.",
-      "engaged_power_required": "Enter the engaged power in kW for this item type."
+      "line_items_invalid": "The text isn't valid: {error_detail}"
     }
   }
 }

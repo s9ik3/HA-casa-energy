@@ -45,56 +45,88 @@ The tariff fields (price/kWh, fixed costs, extra fees, tax rate) are internally 
 If you have a PDF or photo of your electricity bill and want to quickly work out the values to enter, you can paste this prompt (along with the document) into an AI assistant able to read documents/images (e.g. Claude, ChatGPT):
 
 ```
-Analyze this electricity bill and extract the tariff values in this
-exact format (numbers with a DOT as decimal separator, never a comma).
+Analyze this electricity bill and extract the tariff values.
 
-First, decide whether the bill has a SIMPLE structure (energy + fixed
-cost + optional extra fees + a single tax rate) or a MORE ARTICULATED one
-(several distinct fee line items, seasonal/one-off components, amounts
-not subject to tax, discounts or credits). Then return:
+First the four base fields (numbers with a DOT as decimal separator,
+never a comma):
 
-ALWAYS these four base fields:
-price_per_kwh: (energy price per kWh, net of tax — look for line items
-  like "energy charge", "supply cost". If the bill has several distinct
-  energy line items, put only the main energy component here and move
-  the others to the "additional items" below)
-fixed_monthly_cost: (a SINGLE all-inclusive fixed monthly cost — if the
-  bill lists several separate fixed charges, either sum them here, or
-  list them individually as "additional items" below if you'd rather
-  keep them distinct)
-extra_charges_per_kwh: (a SINGLE system charge/tax per kWh — if there's
-  more than one, either sum them here or list them as "additional items")
-vat_rate: (main tax rate as a percentage, e.g. 10 or 22 — just the
-  number, no % symbol)
+price_per_kwh: 0
+fixed_monthly_cost: 0
+extra_charges_per_kwh: 0
+vat_rate: (main tax rate as a percentage, e.g. 10 or 22)
 
-ONLY IF the bill has components the four fields above can't faithfully
-represent (multiple items you want to keep distinct, seasonal/one-off
-amounts, amounts WITHOUT tax, deductions/credits), also list an
-"Additional items" table with one row per item:
+Leave the first three at 0: every bill component should instead be
+listed as an advanced item below, to avoid losing precision by
+compressing multiple items into one number.
 
-| Name | Type (per kWh / fixed monthly) | Value | Apply tax (yes/no) | Months (e.g. 1-10, or empty for year-round) |
+Then list EVERY item on the bill (energy charge, fixed charge, capacity
+charge, every system fee, taxes, discounts, roundings, etc.) as a YAML
+block, in this EXACT format, ready to paste as-is:
 
-Use a NEGATIVE value to represent a deduction or credit.
+- name: "<item name, e.g. Energy consumption>"
+  type: per_kwh
+  value: <number, can be negative for discounts/deductions>
+- name: "<another item>"
+  type: fixed
+  value: <number>
 
-If a value can't be clearly determined from the document, write "not
-found" for that field instead of guessing, and briefly explain where you
-looked.
+Rules for 'type':
+- per_kwh: if the bill item is multiplied by the kWh consumed in the
+  period
+- fixed: if the item is a fixed monthly amount, independent of
+  consumption
+- per_kw_power: if the item is calculated on the engaged power in kW
+  (not on kWh) — in this case also add 'engaged_power_kw: <number>' with
+  the engaged power shown on the bill
+
+For each item, add 'apply_vat: false' ONLY if the bill explicitly shows
+it as not subject to tax (e.g. a rounding with an "out of scope" tax
+code or similar); otherwise omit the field (tax applies by default). If
+an item is seasonal (active only in certain months), add
+'month_from: <1-12>' and 'month_to: <1-12>'.
+
+If a value can't be clearly determined from the document, omit that item
+and flag it separately instead of making up a number.
 ```
 
-The four base values should be entered as-is (with a dot) in the "Tariff" configuration step. If the AI also returned an "Additional items" table, those rows go into the "Manage advanced tariff line items" step (see below) one at a time — name, type, value, and the two optional columns map directly to the fields requested in that step. Always double-check the extracted values against the bill: the AI can misread non-standard line items or bills with multiple time-of-use rates.
+The three base fields should be left at 0 in the "Tariff" step (only the tax rate needs filling in), and the YAML block returned by the AI should be pasted in full into the "Tariff line items (YAML)" field of the next step (see below). Always double-check the extracted values against the bill: the AI can misread non-standard line items or bills with multiple time-of-use rates.
 
 ### Advanced tariff line items (bills with multiple components)
 
-If your bill has a more complex structure than the four simple fields (several distinct fees, seasonal components, amounts not subject to tax, etc.), from the "Tariff" step in the Options you can check "Manage advanced tariff line items" to add as many as you need. Each item has:
+If your bill has a more complex structure than the four simple fields (several distinct fees, seasonal components, amounts not subject to tax, etc.), from the "Tariff" step in the Options check "Manage advanced tariff line items": a text field opens where you paste **all the items at once**, as YAML — a list with one block per item:
 
-- A free-form **name** (e.g. "System charges", "Seasonal contribution")
-- A **type**: *per kWh consumed* (multiplied by the month's kWh), *fixed monthly amount*, or *per kW of engaged power* (multiplied by the contract's power, not consumption — useful for components like the transport capacity charge, which on bills are calculated on kW rather than kWh)
-- A **value**, which can be negative to represent a deduction/credit
-- **Engaged power in kW**: required only for the "per kW of engaged power" type
-- **Apply tax**: if disabled, that item is added to the final cost without the configured tax rate applied to it
-- An optional **month range**: for seasonal items, e.g. 1 to 10 for "January-October"; left empty it applies year-round
+```yaml
+- name: Energy consumption
+  type: per_kwh
+  value: 0.1122
+- name: Fixed charge
+  type: fixed
+  value: 9.10
+- name: Transport capacity charge
+  type: per_kw_power
+  value: 1.96
+  engaged_power_kw: 3.0
+- name: Rounding
+  type: fixed
+  value: -0.43
+  apply_vat: false
+- name: Seasonal cost
+  type: fixed
+  value: 9.00
+  apply_vat: false
+  month_from: 1
+  month_to: 10
+```
 
-Line items are added on top of the four simple fields, not a replacement for them: if you don't add any, the calculation stays identical to before. Like the simple tariff, line items are also frozen on already-closed months when you modify them (see below).
+Fields per item:
+- **name**: free-form, must be different for each item
+- **type**: `per_kwh` (multiplied by the month's kWh), `fixed` (fixed monthly amount), or `per_kw_power` (multiplied by the engaged power — useful for components like the transport capacity charge, calculated on kW rather than kWh)
+- **value**: can be negative, to represent a deduction/credit
+- **engaged_power_kw**: required only for the `per_kw_power` type
+- **apply_vat**: `false` to exclude that item from the tax rate configured above; if omitted, tax applies (defaults to `true`)
+- **month_from** / **month_to**: optional, 1-12, for seasonal items active only in certain months; if omitted the item applies year-round
+
+If the pasted text isn't valid YAML or is missing a required field, the step flags the specific problem (which item and which field) instead of silently dropping an item. Leave the field empty to have no advanced items — reopen the step at any time to see and edit the ones already saved, pre-filled automatically. Line items are added on top of the four simple fields, not a replacement for them. Like the simple tariff, line items are also frozen on already-closed months when you modify them (see below).
 
 ## Changing the configuration after installation
 

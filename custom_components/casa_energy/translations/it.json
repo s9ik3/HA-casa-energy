@@ -110,25 +110,10 @@
         }
       },
       "manage_line_items": {
-        "title": "Voci di tariffa avanzate ({count} presenti)",
-        "description": "Queste voci si sommano ai quattro campi sopra: usale per oneri aggiuntivi distinti, componenti stagionali (es. attive solo in certi mesi), o importi non soggetti a IVA. Seleziona quelle da rimuovere, oppure spunta 'Aggiungi una nuova voce' per crearne una.",
+        "title": "Voci di tariffa avanzate",
+        "description": "Incolla qui tutte le voci in formato YAML, una lista con un blocco per voce. Campi per ogni voce: name (nome libero), type (per_kwh, fixed, oppure per_kw_power), value (numero, può essere negativo per una detrazione), apply_vat (true/false, opzionale, default true), engaged_power_kw (richiesto solo per type per_kw_power), month_from e month_to (1-12, opzionali, per voci stagionali). Lascia il campo vuoto per non avere voci avanzate. Esempio:\n\n{example}\n\n{error_detail}",
         "data": {
-          "remove_line_items": "Rimuovi voci",
-          "add_new": "Aggiungi una nuova voce"
-        }
-      },
-      "edit_line_item": {
-        "title": "Nuova voce di tariffa",
-        "description": "Nome libero (es. 'Oneri di sistema', 'Contributo stagionale'). Tipo: 'Per kWh consumato' moltiplica il valore per i kWh del mese; 'Importo fisso mensile' si applica una volta a prescindere dal consumo; 'Per kW di potenza impegnata' moltiplica il valore per la potenza in kW indicata sotto (per componenti calcolate sulla potenza del contratto, non sul consumo). Il range di mesi è opzionale: lascialo vuoto per applicare la voce tutto l'anno, oppure impostalo per voci stagionali (es. da 1 a 10 per gennaio-ottobre).",
-        "data": {
-          "name": "Nome voce",
-          "type": "Tipo",
-          "value": "Valore (può essere negativo per una detrazione)",
-          "engaged_power_kw": "Potenza impegnata in kW (solo per il tipo 'per kW di potenza')",
-          "apply_vat": "Applica l'IVA configurata sopra a questa voce",
-          "month_from": "Mese iniziale (1-12, opzionale)",
-          "month_to": "Mese finale (1-12, opzionale)",
-          "add_another": "Aggiungi un'altra voce dopo questa"
+          "line_items_yaml": "Voci di tariffa (YAML)"
         }
       },
       "power": {
@@ -152,8 +137,7 @@
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
       "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
       "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista.",
-      "line_item_name_required": "Dai un nome alla voce di tariffa.",
-      "engaged_power_required": "Indica la potenza impegnata in kW per questo tipo di voce."
+      "line_items_invalid": "Il testo non è valido: {error_detail}"
     }
   }
 }

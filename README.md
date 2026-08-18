@@ -45,57 +45,88 @@ I campi della tariffa (prezzo/kWh, costi fissi, oneri, IVA) sono validati intern
 Se hai una bolletta PDF o una foto e vuoi ricavare rapidamente i valori da inserire, puoi incollare questo prompt (insieme al documento) in un assistente IA capace di leggere documenti/immagini (es. Claude, ChatGPT):
 
 ```
-Analizza questa bolletta elettrica ed estrai i valori della tariffa in
-questo formato esatto (numeri con il PUNTO come separatore decimale, mai
-la virgola).
+Analizza questa bolletta elettrica ed estrai i valori della tariffa.
 
-Prima di tutto valuta se la bolletta ha una struttura SEMPLICE (energia +
-costo fisso + eventuali oneri + IVA unica) o PIÙ ARTICOLATA (più voci di
-onere distinte, componenti stagionali/una tantum, importi non soggetti a
-IVA, sconti o detrazioni). Poi restituisci:
+Prima i quattro campi base (numeri con il PUNTO come separatore decimale,
+mai la virgola):
 
-SEMPRE questi quattro campi base:
-price_per_kwh: (prezzo dell'energia per kWh, al netto di IVA — cerca voci
-  come "materia energia", "PE", "prezzo energia". Se la bolletta ha più
-  voci energia distinte, indica qui solo la componente energia principale
-  e sposta le altre nelle "voci aggiuntive" sotto)
-fixed_monthly_cost: (un SOLO costo fisso mensile onnicomprensivo — se la
-  bolletta elenca più quote fisse separate, sommale qui, oppure elencale
-  singolarmente come "voci aggiuntive" sotto se preferisci tenerle
-  distinte)
-extra_charges_per_kwh: (un SOLO onere di sistema/accisa per kWh — se ce
-  ne sono più di uno, sommali qui, oppure elencali come "voci aggiuntive")
-vat_rate: (aliquota IVA principale in percentuale, es. 10 oppure 22 —
-  solo il numero, senza simbolo %)
+price_per_kwh: 0
+fixed_monthly_cost: 0
+extra_charges_per_kwh: 0
+vat_rate: (aliquota IVA principale in percentuale, es. 10 oppure 22)
 
-SOLO SE la bolletta ha componenti che i quattro campi sopra non possono
-rappresentare fedelmente (voci multiple che vuoi tenere distinte, importi
-stagionali/una tantum, importi SENZA IVA, detrazioni/crediti), elenca
-anche una tabella "Voci aggiuntive" con una riga per voce:
+Lascia i primi tre a 0: ogni componente della bolletta va invece elencata
+come voce avanzata qui sotto, per non perdere precisione comprimendo più
+voci in un solo numero.
 
-| Nome | Tipo (per kWh / fisso mensile) | Valore | Applica IVA (sì/no) | Mesi (es. 1-10, o vuoto se tutto l'anno) |
+Poi elenca OGNI voce della bolletta (quota energia, quota fissa, quota
+potenza, ogni onere di sistema, accise, sconti, arrotondamenti, ecc.)
+come blocco YAML, in questo formato ESATTO, pronto da incollare così
+com'è:
 
-Usa un valore NEGATIVO per rappresentare una detrazione o un credito.
+- name: "<nome della voce, es. Consumo energia>"
+  type: per_kwh
+  value: <numero, anche negativo per sconti/detrazioni>
+- name: "<altra voce>"
+  type: fixed
+  value: <numero>
 
-Se un valore non è chiaramente deducibile dal documento, scrivi "non
-trovato" per quel campo invece di inventarlo, e spiega brevemente dove
-hai cercato.
+Regole per 'type':
+- per_kwh: se la voce in bolletta è moltiplicata per i kWh consumati nel
+  periodo
+- fixed: se la voce è un importo fisso mensile, indipendente dal consumo
+- per_kw_power: se la voce è calcolata sulla potenza impegnata in kW (non
+  sui kWh) — in questo caso aggiungi anche 'engaged_power_kw: <numero>'
+  con la potenza impegnata indicata in bolletta
+
+Per ogni voce, aggiungi 'apply_vat: false' SOLO se in bolletta risulta
+esplicitamente non soggetta a IVA (es. un arrotondamento con codice IVA
+"fuori campo" o simile); altrimenti ometti il campo (l'IVA si applica di
+default). Se una voce è stagionale (attiva solo in alcuni mesi), aggiungi
+'month_from: <1-12>' e 'month_to: <1-12>'.
+
+Se un valore non è chiaramente deducibile dal documento, ometti quella
+voce e segnalalo a parte, invece di inventare un numero.
 ```
 
-I quattro valori base vanno inseriti così come sono (con il punto) nello step "Tariffa" della configurazione. Se l'IA ha restituito anche una tabella "Voci aggiuntive", quelle righe vanno inserite una alla volta nello step "Gestisci voci di tariffa avanzate" (vedi sotto) — nome, tipo, valore, e le due colonne opzionali coincidono direttamente con i campi richiesti in quello step. Ricontrolla sempre i valori estratti confrontandoli con la bolletta: l'IA può interpretare male voci non standard o bollette con più fasce orarie.
+I tre campi base vanno lasciati a 0 nello step "Tariffa" (solo l'IVA va compilata), e il blocco YAML restituito dall'IA va incollato per intero nel campo "Voci di tariffa (YAML)" dello step successivo (vedi sotto). Ricontrolla sempre i valori estratti confrontandoli con la bolletta: l'IA può interpretare male voci non standard o bollette con più fasce orarie.
 
 ### Voci di tariffa avanzate (bollette con più componenti)
 
-Se la tua bolletta ha una struttura più complessa dei quattro campi semplici (più oneri distinti, componenti stagionali, importi non soggetti a IVA, ecc.), dallo step "Tariffa" delle Opzioni puoi spuntare "Gestisci voci di tariffa avanzate" per aggiungerne quante ne servono. Ogni voce ha:
+Se la tua bolletta ha una struttura più complessa dei quattro campi semplici (più oneri distinti, componenti stagionali, importi non soggetti a IVA, ecc.), dallo step "Tariffa" delle Opzioni spunta "Gestisci voci di tariffa avanzate": si apre un campo di testo dove incolli **tutte le voci in un colpo solo**, come YAML — una lista con un blocco per voce:
 
-- **Nome** libero (es. "Oneri di sistema", "Contributo stagionale")
-- **Tipo**: *per kWh consumato* (moltiplicato per i kWh del mese), *importo fisso mensile*, oppure *per kW di potenza impegnata* (moltiplicato per la potenza del contratto, non per il consumo — utile per componenti come la quota potenza del trasporto, che in bolletta sono calcolate sui kW e non sui kWh)
-- **Valore**: può essere negativo, per rappresentare una detrazione/credito
-- **Potenza impegnata in kW**: richiesta solo per il tipo "per kW di potenza impegnata"
-- **Applica IVA**: se disattivato, quella voce si somma al costo finale senza subire l'aliquota IVA configurata sopra
-- **Range di mesi** (opzionale): per voci stagionali, es. da 1 a 10 per "gennaio-ottobre"; lasciato vuoto si applica tutto l'anno
+```yaml
+- name: Consumo energia
+  type: per_kwh
+  value: 0.1122
+- name: Quota fissa
+  type: fixed
+  value: 9.10
+- name: Quota potenza trasporto
+  type: per_kw_power
+  value: 1.96
+  engaged_power_kw: 3.0
+- name: Arrotondamenti
+  type: fixed
+  value: -0.43
+  apply_vat: false
+- name: Costo stagionale
+  type: fixed
+  value: 9.00
+  apply_vat: false
+  month_from: 1
+  month_to: 10
+```
 
-Le voci extra si sommano ai quattro campi semplici, non li sostituiscono: se non ne aggiungi nessuna, il calcolo resta identico a prima. Come per la tariffa semplice, anche le voci extra vengono congelate sui mesi già chiusi quando le modifichi (vedi sotto).
+Campi per voce:
+- **name**: nome libero, deve essere diverso per ogni voce
+- **type**: `per_kwh` (moltiplicato per i kWh del mese), `fixed` (importo fisso mensile), oppure `per_kw_power` (moltiplicato per la potenza impegnata — utile per componenti come la quota potenza del trasporto, calcolate sui kW e non sui kWh)
+- **value**: può essere negativo, per rappresentare una detrazione/credito
+- **engaged_power_kw**: richiesto solo per il tipo `per_kw_power`
+- **apply_vat**: `false` per escludere quella voce dall'IVA configurata sopra; se omesso, l'IVA si applica (default `true`)
+- **month_from** / **month_to**: opzionali, 1-12, per voci stagionali attive solo in certi mesi; se omessi la voce si applica tutto l'anno
+
+Se il testo incollato non è YAML valido o manca un campo obbligatorio, lo step segnala l'errore specifico (quale voce e quale campo) invece di far sparire silenziosamente una voce. Lascia il campo vuoto per non avere voci avanzate — riapri lo step in qualsiasi momento per vedere e modificare quelle già salvate, precompilate automaticamente. Le voci extra si sommano ai quattro campi semplici, non li sostituiscono. Come per la tariffa semplice, anche le voci extra vengono congelate sui mesi già chiusi quando le modifichi (vedi sotto).
 
 ## Modificare la configurazione dopo l'installazione
 
