@@ -31,8 +31,7 @@ After installing and restarting:
 2. Follow the guided steps:
    - **Instance name**: a label for this configuration (useful if you want to track multiple meters/homes separately in the future)
    - **Energy sensors**: select one or more sensors with `device_class: energy` you want history for. These are the devices that count toward the total instant power. The power sensor (Watts) of the same device is identified **automatically** (same Home Assistant device): you don't need to select it again. If a device has more than one power sensor, you'll be asked which one to use; if it has none, a blocking warning flags it (with the option to proceed anyway, accepting that device won't be counted)
-   - **Tariff**: energy price (currency/kWh), fixed monthly costs, any extra fees, tax rate — always double-check these against your real bill
-   - **Instant power**: your meter/system's maximum power, alert thresholds (as percentages)
+   - **Tariff and power**: energy price (currency/kWh), fixed monthly costs, any extra fees, tax rate (always double-check these against your real bill), plus your meter/system's maximum power and alert thresholds — all in a single step. If your bill has a more articulated structure, you can add detailed tariff line items later from the Options (see below)
 
 If you also want to show devices that should **not** count toward the total (e.g. one already included in an aggregated load, or just something you want to keep an eye on), add them directly from the card's editor — see below.
 
@@ -127,6 +126,16 @@ Fields per item:
 - **month_from** / **month_to**: optional, 1-12, for seasonal items active only in certain months; if omitted the item applies year-round
 
 If the pasted text isn't valid YAML or is missing a required field, the step flags the specific problem (which item and which field) instead of silently dropping an item. Leave the field empty to have no advanced items — reopen the step at any time to see and edit the ones already saved, pre-filled automatically. Line items are added on top of the four simple fields, not a replacement for them. Like the simple tariff, line items are also frozen on already-closed months when you modify them (see below).
+
+The step also shows a **cost preview**: it applies the currently saved tariff to the current month's consumption, so you can immediately check whether the total adds up before changing anything — useful for verifying the results of a change you just made without leaving the step to check the card.
+
+If you have the exact bill total at hand, you can also fill in the optional **"Reference cost"** field: before saving, the step calculates the gap between your YAML block and that value, and if it's above 5% it blocks saving with a message explaining the gap in euros and percentage — a quick way to catch a wrong or missing item without having to compare manually against the card afterward. If the gap is expected (e.g. the reference includes a service not managed by the integration, like a subscription fee), submit again leaving the field empty to save anyway.
+
+The comparison uses the **current month's** kWh by default. If the bill you're checking against is from a different month (e.g. you're setting up the configuration using an older bill as an example), also fill in the optional **"Month of the reference bill"** field (`YYYY-MM` format, e.g. `2026-06`): the comparison will use the kWh already calculated for that specific month instead of the current one. If the month you entered isn't in the history yet, the step flags it and lists the available months.
+
+### Checking the configured tariff without opening Configure
+
+The `sensor.<name>_monthly_energy_history` sensor exposes a `tariffa` attribute with the four base fields and the full list of currently saved advanced line items (name, type, value). You can inspect it from Settings → System → Developer tools → States by searching for the sensor, to quickly verify what's actually configured without reopening the whole Configure flow.
 
 ## Changing the configuration after installation
 

@@ -31,8 +31,7 @@ Dopo l'installazione e il riavvio:
 2. Segui gli step guidati:
    - **Nome istanza**: un'etichetta per questa configurazione (utile se in futuro vuoi tracciare più contatori/case separatamente)
    - **Sensori energy**: seleziona uno o più sensori con `device_class: energy` di cui vuoi lo storico. Questi sono i dispositivi che concorrono al calcolo del totale della potenza istantanea. Il sensore di potenza (Watt) dello stesso dispositivo viene individuato **automaticamente** (stesso device Home Assistant): non serve selezionarlo di nuovo. Se un dispositivo ha più sensori di potenza, ti verrà chiesto quale usare; se non ne ha nessuno, un avviso bloccante te lo segnala (con possibilità di procedere comunque accettando che quel dispositivo non venga conteggiato)
-   - **Tariffa**: prezzo energia (€/kWh), costi fissi mensili, eventuali oneri aggiuntivi, aliquota IVA — verifica sempre questi valori con la tua bolletta reale
-   - **Potenza istantanea**: potenza massima del tuo contatore/impianto, soglie di allerta (in percentuale)
+   - **Tariffa e potenza**: prezzo energia (€/kWh), costi fissi mensili, eventuali oneri aggiuntivi, aliquota IVA (verifica sempre questi valori con la tua bolletta reale), più potenza massima del tuo contatore/impianto e soglie di allerta — tutto in un unico step. Se la tua bolletta ha una struttura più articolata, potrai aggiungere voci di tariffa dettagliate in seguito dalle Opzioni (vedi sotto)
 
 Se vuoi mostrare in card anche dispositivi che **non** devono contare nel totale (es. un dispositivo già incluso in un carico aggregato, o semplicemente qualcosa che vuoi solo monitorare a colpo d'occhio), si aggiungono direttamente dall'editor della card — vedi sotto.
 
@@ -127,6 +126,16 @@ Campi per voce:
 - **month_from** / **month_to**: opzionali, 1-12, per voci stagionali attive solo in certi mesi; se omessi la voce si applica tutto l'anno
 
 Se il testo incollato non è YAML valido o manca un campo obbligatorio, lo step segnala l'errore specifico (quale voce e quale campo) invece di far sparire silenziosamente una voce. Lascia il campo vuoto per non avere voci avanzate — riapri lo step in qualsiasi momento per vedere e modificare quelle già salvate, precompilate automaticamente. Le voci extra si sommano ai quattro campi semplici, non li sostituiscono. Come per la tariffa semplice, anche le voci extra vengono congelate sui mesi già chiusi quando le modifichi (vedi sotto).
+
+Lo step mostra anche un'**anteprima del costo**: applica la tariffa attualmente salvata al consumo del mese in corso, così puoi verificare subito se il totale torna prima ancora di modificare qualcosa — utile per controllare i risultati di un cambiamento appena fatto senza dover uscire e guardare la card.
+
+Se hai il costo esatto della bolletta a portata di mano, puoi anche compilare il campo opzionale **"Costo di riferimento"**: prima di salvare, lo step calcola lo scarto tra il tuo blocco YAML e quel valore, e se supera il 5% blocca il salvataggio con un messaggio che spiega lo scarto in euro e percentuale — un modo rapido per accorgersi di una voce sbagliata o mancante senza dover confrontare a mano con la card dopo aver salvato. Se lo scarto è previsto (es. il riferimento include un servizio non gestito dall'integrazione, come un canone), invia di nuovo lasciando il campo vuoto per salvare comunque.
+
+Il confronto usa di default i kWh del **mese corrente**. Se la bolletta con cui stai verificando i valori è di un mese diverso (es. stai preparando la configurazione guardando una bolletta più vecchia come esempio), compila anche il campo opzionale **"Mese della bolletta di riferimento"** (formato `AAAA-MM`, es. `2026-06`): il confronto userà i kWh già calcolati per quel mese specifico invece di quelli del mese corrente. Se il mese indicato non è ancora nello storico, lo step lo segnala elencando i mesi disponibili.
+
+### Controllare la tariffa configurata senza aprire Configura
+
+Il sensore `sensor.<nome>_storico_consumi_mensili` espone un attributo `tariffa` con i quattro campi base e l'elenco completo delle voci avanzate attualmente salvate (nome, tipo, valore). Puoi consultarlo da Impostazioni → Sistema → Sviluppatori → Stati, cercando il sensore, per verificare rapidamente cosa è effettivamente configurato senza dover riaprire tutto il flusso di Configura.
 
 ## Modificare la configurazione dopo l'installazione
 

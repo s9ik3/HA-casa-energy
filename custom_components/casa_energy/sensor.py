@@ -11,11 +11,16 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     CONF_CRITICAL_THRESHOLD_PCT,
+    CONF_EXTRA_CHARGES_PER_KWH,
+    CONF_FIXED_MONTHLY_COST,
     CONF_INSTANCE_NAME,
     CONF_LOAD_ENTITY,
     CONF_LOAD_NAME,
     CONF_LOADS,
     CONF_MAX_POWER,
+    CONF_PRICE_PER_KWH,
+    CONF_TARIFF_LINE_ITEMS,
+    CONF_VAT_RATE,
     CONF_WARNING_THRESHOLD_PCT,
     DOMAIN,
 )
@@ -66,6 +71,17 @@ class MonthlyEnergyHistorySensor(CoordinatorEntity, SensorEntity):
             "max_power": data.get(CONF_MAX_POWER),
             "warning_threshold_pct": data.get(CONF_WARNING_THRESHOLD_PCT),
             "critical_threshold_pct": data.get(CONF_CRITICAL_THRESHOLD_PCT),
+            # Tariffa attualmente configurata (viva, non quella congelata
+            # sui mesi passati): comoda per verificare dall'interfaccia
+            # cosa è stato effettivamente salvato, senza dover ispezionare
+            # core.config_entries via terminale.
+            "tariffa": {
+                "price_per_kwh": data.get(CONF_PRICE_PER_KWH),
+                "fixed_monthly_cost": data.get(CONF_FIXED_MONTHLY_COST),
+                "extra_charges_per_kwh": data.get(CONF_EXTRA_CHARGES_PER_KWH),
+                "vat_rate": data.get(CONF_VAT_RATE),
+                "voci_avanzate": data.get(CONF_TARIFF_LINE_ITEMS, []),
+            },
         }
 
 
