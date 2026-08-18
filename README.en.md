@@ -36,6 +36,37 @@ After installing and restarting:
 
 If you also want to show devices that should **not** count toward the total (e.g. one already included in an aggregated load, or just something you want to keep an eye on), add them directly from the card's editor — see below.
 
+### Decimal separator in tariff fields
+
+The tariff fields (price/kWh, fixed costs, extra fees, tax rate) are internally validated with a dot as decimal separator (e.g. `0.1122`). In practice, most browsers with a non-English locale automatically convert a comma to a dot when you type in these numeric fields, so entering `0,1122` usually works fine too. If, after saving, the estimated monthly cost shown in the card looks off (too high, too low, or zero), that's a sign the conversion didn't happen in your case: try re-entering the value with a dot (`0.1122`) and check that the estimate makes sense again.
+
+### Extracting tariff values from a bill with AI
+
+If you have a PDF or photo of your electricity bill and want to quickly work out the values to enter, you can paste this prompt (along with the document) into an AI assistant able to read documents/images (e.g. Claude, ChatGPT):
+
+```
+Analyze this electricity bill and extract ONLY these four values,
+returning them in this exact format (numbers with a DOT as decimal
+separator, never a comma):
+
+price_per_kwh: (energy price per kWh, net of tax — look for line items
+  like "energy charge", "supply cost", or divide the energy cost by the
+  kWh consumed in the billing period)
+fixed_monthly_cost: (sum of all fixed monthly costs not tied to
+  consumption: standing charge, capacity charge, service fee, etc. —
+  divide by the number of months covered if the bill spans more than one)
+extra_charges_per_kwh: (system charges/taxes per kWh, if listed
+  separately from the energy price; otherwise 0)
+vat_rate: (tax rate as a percentage, e.g. 10 or 22 — just the number,
+  no % symbol)
+
+If a value can't be clearly determined from the document, write "not
+found" for that field instead of guessing, and briefly explain where you
+looked.
+```
+
+The four values returned should be entered as-is (with a dot) in the "Tariff" configuration step. Always double-check the extracted values against the bill: the AI can misread non-standard line items or bills with multiple time-of-use rates.
+
 ## Changing the configuration after installation
 
 Settings → Devices & services → Casa Energy → **Configure**. You can edit energy sensors, tariff, thresholds, and rename loads at any time, without reinstalling anything. If the energy sensor selection doesn't change, already-resolved loads (including any renames) stay unchanged.

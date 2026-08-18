@@ -36,6 +36,37 @@ Dopo l'installazione e il riavvio:
 
 Se vuoi mostrare in card anche dispositivi che **non** devono contare nel totale (es. un dispositivo già incluso in un carico aggregato, o semplicemente qualcosa che vuoi solo monitorare a colpo d'occhio), si aggiungono direttamente dall'editor della card — vedi sotto.
 
+### Separatore decimale nei campi tariffa
+
+I campi della tariffa (prezzo/kWh, costi fissi, oneri, IVA) sono validati internamente con il punto come separatore decimale (es. `0.1122`). Nella pratica, la maggior parte dei browser con lingua italiana converte automaticamente la virgola in punto quando digiti in questi campi numerici, quindi scrivere `0,1122` funziona comunque nella maggior parte dei casi. Se dopo aver salvato la stima del costo mensile in card ti sembra sballata (troppo alta, troppo bassa, o pari a zero), è il segnale che nel tuo caso la conversione non è avvenuta: riprova scrivendo il valore con il punto (`0.1122`) e verifica che la stima torni sensata.
+
+### Estrarre i valori della tariffa da una bolletta con l'IA
+
+Se hai una bolletta PDF o una foto e vuoi ricavare rapidamente i valori da inserire, puoi incollare questo prompt (insieme al documento) in un assistente IA capace di leggere documenti/immagini (es. Claude, ChatGPT):
+
+```
+Analizza questa bolletta elettrica ed estrai SOLO questi quattro valori,
+restituendoli in questo formato esatto (numeri con il PUNTO come
+separatore decimale, mai la virgola):
+
+price_per_kwh: (prezzo dell'energia per kWh, al netto di IVA — cerca voci
+  come "materia energia", "PE", "prezzo energia", o dividi il costo
+  dell'energia consumata per i kWh consumati nel periodo)
+fixed_monthly_cost: (somma di tutti i costi fissi mensili non legati al
+  consumo: quota fissa, quota potenza, canone, PCV, ecc. — dividi per il
+  numero di mesi del periodo fatturato se la bolletta copre più mesi)
+extra_charges_per_kwh: (oneri di sistema/accise per kWh, se indicati
+  separatamente dal prezzo energia; altrimenti 0)
+vat_rate: (aliquota IVA in percentuale, es. 10 oppure 22 — solo il numero,
+  senza simbolo %)
+
+Se un valore non è chiaramente deducibile dal documento, scrivi "non
+trovato" per quel campo invece di inventarlo, e spiega brevemente dove
+hai cercato.
+```
+
+I quattro valori restituiti vanno inseriti così come sono (con il punto) nello step "Tariffa" della configurazione. Ricontrolla sempre i valori estratti confrontandoli con la bolletta: l'IA può interpretare male voci non standard o bollette con più fasce orarie.
+
 ## Modificare la configurazione dopo l'installazione
 
 Impostazioni → Dispositivi e servizi → Casa Energy → **Configura**. Puoi modificare sensori energy, tariffa, soglie e rinominare i carichi in qualsiasi momento, senza reinstallare nulla. Se la selezione dei sensori energy non cambia, i carichi già risolti (incluse eventuali rinomine) restano invariati.
