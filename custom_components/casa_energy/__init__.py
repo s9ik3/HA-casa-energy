@@ -1,6 +1,7 @@
 """Integrazione Casa Energy: storico consumi + potenza istantanea."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 import logging
 from pathlib import Path
@@ -92,10 +93,14 @@ async def _async_register_card_resource(hass: HomeAssistant) -> None:
     risorsa Lovelace, così la card compare nel picker 'Aggiungi card'
     senza che l'utente debba configurare nulla manualmente.
 
-    Se qualcosa fallisce (es. dashboard non ancora in modalità storage,
-    lovelace non pronto), viene solo loggato un avviso: l'integrazione
-    resta comunque pienamente funzionante, l'utente può sempre aggiungere
-    la risorsa a mano se l'auto-registrazione non riesce.
+    Nota tecnica: la chiave giusta in hass.data per l'oggetto Lovelace è
+    "lovelace" (non "lovelace_resources", che non esiste e faceva
+    fallire silenziosamente la registrazione in versioni precedenti).
+    L'oggetto lovelace espone .resources (lo storage vero e proprio) e
+    .mode (storage/yaml). Se il dashboard è in modalità YAML, la
+    registrazione automatica non è supportata da Home Assistant: viene
+    solo loggato un avviso, l'utente può sempre aggiungere la risorsa a
+    mano se l'auto-registrazione non riesce.
     """
     www_path = Path(__file__).parent / "www" / CARD_JS_FILENAME
     try:
@@ -106,24 +111,48 @@ async def _async_register_card_resource(hass: HomeAssistant) -> None:
         _LOGGER.warning("Impossibile registrare il file statico della card: %s", err)
         return
 
-    try:
-        resource_storage = hass.data.get("lovelace_resources")
-        if resource_storage is None:
-            _LOGGER.info(
-                "Dashboard Lovelace non in modalità storage: aggiungi la "
-                "risorsa %s manualmente da Impostazioni → Dashboard → Risorse.",
-                CARD_URL_PATH,
-            )
-            return
+    lovelace = hass.data.get("lovelace")
+    if lovelace is None:
+        _LOGGER.info(
+            "Componente Lovelace non ancora disponibile: aggiungi la "
+            "risorsa %s manualmente da Impostazioni → Dashboard → Risorse.",
+            CARD_URL_PATH,
+        )
+        return
 
-        existing = [
-            r for r in resource_storage.async_items() if r["url"] == CARD_URL_PATH
-        ]
+    mode = getattr(lovelace, "mode", getattr(lovelace, "resource_mode", "yaml"))
+    if mode != "storage":
+        _LOGGER.info(
+            "Dashboard Lovelace non in modalità storage: aggiungi la "
+            "risorsa %s manualmente da Impostazioni → Dashboard → Risorse.",
+            CARD_URL_PATH,
+        )
+        return
+
+    # Le risorse Lovelace potrebbero non essere ancora caricate al momento
+    # in cui l'integrazione viene impostata (specie all'avvio di HA):
+    # ritentiamo con un breve backoff invece di arrenderci al primo giro.
+    resources = lovelace.resources
+    for attempt in range(10):
+        if getattr(resources, "loaded", True):
+            break
+        await asyncio.sleep(1)
+    else:
+        _LOGGER.warning(
+            "Le risorse Lovelace non risultano caricate dopo l'attesa: "
+            "aggiungi la risorsa manualmente se non compare da sola. "
+            "URL %s, tipo Modulo JavaScript.",
+            CARD_URL_PATH,
+        )
+        return
+
+    try:
+        existing = [r for r in resources.async_items() if r["url"] == CARD_URL_PATH]
         if existing:
             hass.data[DOMAIN][_RESOURCE_ID_KEY] = existing[0]["id"]
             return
 
-        item = await resource_storage.async_create_item(
+        item = await resources.async_create_item(
             {"res_type": "module", "url": CARD_URL_PATH}
         )
         hass.data[DOMAIN][_RESOURCE_ID_KEY] = item["id"]
@@ -146,9 +175,9 @@ async def _async_unregister_card_resource(hass: HomeAssistant) -> None:
     if not resource_id:
         return
     try:
-        resource_storage = hass.data.get("lovelace_resources")
-        if resource_storage is not None:
-            await resource_storage.async_delete_item(resource_id)
+        lovelace = hass.data.get("lovelace")
+        if lovelace is not None:
+            await lovelace.resources.async_delete_item(resource_id)
             _LOGGER.info("Casa Energy Card rimossa dalle risorse Lovelace")
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning(
