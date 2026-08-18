@@ -186,7 +186,7 @@ class _DeviceMatchingMixin:
 class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, domain=DOMAIN):
     """Gestisce il flow di configurazione iniziale (aggiunta integrazione)."""
 
-    VERSION = 1
+    VERSION = 2
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}

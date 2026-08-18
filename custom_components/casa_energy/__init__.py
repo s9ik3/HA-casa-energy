@@ -15,11 +15,16 @@ from .const import (
     CONF_ENERGY_SENSORS,
     CONF_EXTRA_CHARGES_PER_KWH,
     CONF_FIXED_MONTHLY_COST,
+    CONF_LOAD_ENERGY_ENTITY,
+    CONF_LOAD_ENTITY,
+    CONF_LOAD_NAME,
+    CONF_LOADS,
     CONF_PRICE_PER_KWH,
     CONF_VAT_RATE,
     DOMAIN,
     UPDATE_INTERVAL_MINUTES,
 )
+from .device_matching import resolve_power_sensors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +34,70 @@ CARD_URL_PATH = "/casa_energy_static/casa-energy-card.js"
 CARD_JS_FILENAME = "casa-energy-card.js"
 _INSTANCES_KEY = "instance_count"
 _RESOURCE_ID_KEY = "lovelace_resource_id"
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Chiamato automaticamente da Home Assistant quando trova una config
+    entry con entry.version inferiore a CasaEnergyConfigFlow.VERSION.
+
+    Serve come rete di sicurezza per istanze rimaste su una versione
+    precedente dell'integrazione: senza questa migrazione, un'istanza
+    configurata prima che il matching automatico energy→power esistesse
+    (o comunque con CONF_LOADS mancante/vuoto) restava con un sensore di
+    potenza permanentemente "Non disponibile" finché l'utente non
+    reinstallava manualmente l'integrazione da zero.
+
+    La migrazione qui è "best effort": se i sensori energy configurati
+    sono ancora presenti, ritenta il matching automatico per ricostruire
+    CONF_LOADS. Se qualcosa non torna, logga e lascia la entry invariata
+    piuttosto che rischiare di corrompere una configurazione funzionante.
+    """
+    if entry.version >= 2:
+        return True
+
+    data = dict(entry.data)
+
+    if not data.get(CONF_LOADS):
+        energy_sensors = data.get(CONF_ENERGY_SENSORS, [])
+        if energy_sensors:
+            try:
+                result = resolve_power_sensors(hass, energy_sensors)
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.warning(
+                    "Migrazione Casa Energy: impossibile ricostruire i carichi "
+                    "automaticamente (%s). Riapri Configura sull'integrazione "
+                    "per completare manualmente la configurazione.",
+                    err,
+                )
+                result = None
+
+            if result and result.matched:
+                data[CONF_LOADS] = [
+                    {
+                        CONF_LOAD_NAME: info["name"],
+                        CONF_LOAD_ENTITY: info["power_entity"],
+                        CONF_LOAD_ENERGY_ENTITY: energy_entity,
+                    }
+                    for energy_entity, info in result.matched.items()
+                ]
+                _LOGGER.info(
+                    "Migrazione Casa Energy: ricostruiti %d carichi automaticamente "
+                    "per l'istanza '%s'.",
+                    len(data[CONF_LOADS]),
+                    data.get("instance_name", entry.entry_id),
+                )
+            else:
+                _LOGGER.warning(
+                    "Migrazione Casa Energy: nessun carico ricostruibile "
+                    "automaticamente per l'istanza '%s' (device senza sensore "
+                    "power abbinato, o sensori energy non più esistenti). "
+                    "Riapri Configura sull'integrazione per completare la "
+                    "configurazione manualmente.",
+                    data.get("instance_name", entry.entry_id),
+                )
+
+    hass.config_entries.async_update_entry(entry, data=data, version=2)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -126,24 +126,57 @@ class CasaEnergyCard extends HTMLElement {
             text-overflow: ellipsis;
             white-space: nowrap;
           }
-          .cec-month-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+          .cec-month-section {
             margin-top: 12px;
             padding-top: 10px;
             border-top: 1px solid rgba(127,127,127,0.15);
           }
+          .cec-month-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+          }
+          .cec-month-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 700;
+          }
           .cec-month-kwh {
             font-weight: 800;
-            font-size: 15px;
+            font-size: 18px;
+            text-align: right;
           }
           .cec-month-cost {
             font-size: 11px;
             opacity: 0.65;
+            text-align: right;
+          }
+          .cec-month-bar-track {
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(127,127,127,0.12);
+            overflow: hidden;
+            margin-top: 8px;
+          }
+          .cec-month-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: #42a5f5;
+            transition: width 0.3s ease;
+          }
+          .cec-history-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 10px;
+            cursor: pointer;
           }
           .cec-history {
-            margin-top: 8px;
+            margin-top: 4px;
           }
           .cec-history-row {
             padding: 6px 0;
@@ -197,17 +230,26 @@ class CasaEnergyCard extends HTMLElement {
           <div class="cec-bar-fill" id="cec-bar-fill" style="width:0%;"></div>
         </div>
         <div class="cec-loads" id="cec-loads"></div>
-        <div class="cec-month-row" id="cec-month-row" style="cursor:pointer;">
-          <span style="font-size:12px;opacity:0.7;display:flex;align-items:center;gap:4px;">
-            <span id="cec-toggle-arrow" style="font-size:9px;transition:transform 0.2s;">▸</span>
-            Mese corrente
-          </span>
-          <div style="text-align:right;">
-            <div class="cec-month-kwh" id="cec-month-kwh">-- kWh</div>
-            <div class="cec-month-cost" id="cec-month-cost"></div>
+        <div class="cec-month-section">
+          <div class="cec-month-header">
+            <div class="cec-month-title">
+              <ha-icon icon="mdi:calendar-month" style="--mdc-icon-size:16px;"></ha-icon>
+              Mese corrente
+            </div>
+            <div>
+              <div class="cec-month-kwh" id="cec-month-kwh">-- kWh</div>
+              <div class="cec-month-cost" id="cec-month-cost"></div>
+            </div>
           </div>
+          <div class="cec-month-bar-track">
+            <div class="cec-month-bar-fill" id="cec-month-bar-fill" style="width:0%;"></div>
+          </div>
+          <div class="cec-history-toggle" id="cec-history-toggle">
+            <span id="cec-toggle-arrow" style="font-size:9px;transition:transform 0.2s;">▸</span>
+            <span id="cec-history-toggle-label">Mostra mesi precedenti</span>
+          </div>
+          <div class="cec-history" id="cec-history" style="display:none;"></div>
         </div>
-        <div class="cec-history" id="cec-history" style="display:none;"></div>
       </ha-card>
     `;
     this._powerEl = this.shadowRoot.querySelector("#cec-power");
@@ -217,14 +259,24 @@ class CasaEnergyCard extends HTMLElement {
     this._loadsEl = this.shadowRoot.querySelector("#cec-loads");
     this._monthKwhEl = this.shadowRoot.querySelector("#cec-month-kwh");
     this._monthCostEl = this.shadowRoot.querySelector("#cec-month-cost");
+    this._monthBarFill = this.shadowRoot.querySelector("#cec-month-bar-fill");
     this._historyEl = this.shadowRoot.querySelector("#cec-history");
+    this._historyToggleLabel = this.shadowRoot.querySelector("#cec-history-toggle-label");
     this._toggleArrow = this.shadowRoot.querySelector("#cec-toggle-arrow");
     this._historyOpen = false;
 
-    this.shadowRoot.querySelector("#cec-month-row").addEventListener("click", () => {
+    this.shadowRoot.querySelector("#cec-history-toggle").addEventListener("click", () => {
       this._historyOpen = !this._historyOpen;
       this._historyEl.style.display = this._historyOpen ? "block" : "none";
       this._toggleArrow.style.transform = this._historyOpen ? "rotate(90deg)" : "rotate(0deg)";
+      const passatiCount = (this._mesi || []).filter((m) => {
+        const now = new Date();
+        const ymCorr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        return m.mese !== ymCorr;
+      }).length;
+      this._historyToggleLabel.textContent = this._historyOpen
+        ? "Nascondi mesi precedenti"
+        : `Mostra mesi precedenti (${passatiCount})`;
       this._renderHistory();
     });
   }
@@ -360,6 +412,20 @@ class CasaEnergyCard extends HTMLElement {
         this._monthCostEl.textContent =
           corr && corr.costo != null ? `~ € ${corr.costo.toFixed(2)}` : "";
       }
+
+      // La barra mostra quanti giorni del mese sono già trascorsi: dà
+      // un riferimento visivo di "a che punto siamo" nel ciclo di
+      // fatturazione corrente, coerente con lo stile a barra già usato
+      // altrove nella card.
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const dayProgress = Math.round((now.getDate() / daysInMonth) * 100);
+      this._monthBarFill.style.width = `${Math.max(0, Math.min(100, dayProgress))}%`;
+
+      const passatiCount = mesi.filter((m) => m.mese !== ymCorr).length;
+      this._historyToggleLabel.textContent = this._historyOpen
+        ? "Nascondi mesi precedenti"
+        : `Mostra mesi precedenti (${passatiCount})`;
+
       if (this._historyOpen) this._renderHistory();
     }
   }
@@ -592,6 +658,7 @@ class CasaEnergyCardEditor extends HTMLElement {
       entityPicker.label = "Sensore potenza";
       entityPicker.value = currentEntity || "";
       entityPicker.includeDomains = ["sensor"];
+      entityPicker.includeDeviceClasses = ["power"];
       if (this._hass) entityPicker.hass = this._hass;
       entityPicker.style.cssText = "width:100%;margin-bottom:16px;display:block;";
       container.appendChild(entityPicker);
