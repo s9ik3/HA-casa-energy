@@ -105,7 +105,29 @@
           "fixed_monthly_cost": "Fixed monthly costs",
           "extra_charges_per_kwh": "Extra fees/taxes (per kWh, optional)",
           "vat_rate": "Tax rate (%)",
-          "reset_frozen_tariffs": "Reset frozen tariffs (recalculate all past months with the tariff above)"
+          "reset_frozen_tariffs": "Reset frozen tariffs (recalculate all past months with the tariff above)",
+          "manage_line_items": "Manage advanced tariff line items (for bills with multiple fees, seasonal components, etc.)"
+        }
+      },
+      "manage_line_items": {
+        "title": "Advanced tariff line items ({count} present)",
+        "description": "These items are added on top of the four fields above: use them for distinct extra fees, seasonal components (e.g. active only in certain months), or amounts not subject to tax. Select any to remove, or check 'Add a new item' to create one.",
+        "data": {
+          "remove_line_items": "Remove items",
+          "add_new": "Add a new item"
+        }
+      },
+      "edit_line_item": {
+        "title": "New tariff line item",
+        "description": "Free-form name (e.g. 'System charges', 'Seasonal contribution'). Type: 'Per kWh consumed' multiplies the value by the month's kWh; 'Fixed monthly amount' applies once regardless of consumption. The month range is optional: leave it empty to apply the item year-round, or set it for seasonal items (e.g. 1 to 10 for January-October).",
+        "data": {
+          "name": "Item name",
+          "type": "Type",
+          "value": "Value (can be negative for a deduction)",
+          "apply_vat": "Apply the tax rate configured above to this item",
+          "month_from": "Start month (1-12, optional)",
+          "month_to": "End month (1-12, optional)",
+          "add_another": "Add another item after this one"
         }
       },
       "power": {
@@ -128,7 +150,8 @@
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
       "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
-      "duplicate_entity": "This sensor has already been added to this list."
+      "duplicate_entity": "This sensor has already been added to this list.",
+      "line_item_name_required": "Give the tariff line item a name."
     }
   }
 }

@@ -18,6 +18,12 @@ from .const import (
     CONF_FIXED_MONTHLY_COST,
     CONF_IGNORE_UNMATCHED,
     CONF_INSTANCE_NAME,
+    CONF_LINE_ITEM_APPLY_VAT,
+    CONF_LINE_ITEM_MONTH_FROM,
+    CONF_LINE_ITEM_MONTH_TO,
+    CONF_LINE_ITEM_NAME,
+    CONF_LINE_ITEM_TYPE,
+    CONF_LINE_ITEM_VALUE,
     CONF_LOAD_ENERGY_ENTITY,
     CONF_LOAD_ENTITY,
     CONF_LOAD_NAME,
@@ -25,6 +31,7 @@ from .const import (
     CONF_MAX_POWER,
     CONF_PRICE_PER_KWH,
     CONF_RESET_FROZEN_TARIFFS,
+    CONF_TARIFF_LINE_ITEMS,
     CONF_VAT_RATE,
     CONF_WARNING_THRESHOLD_PCT,
     DEFAULT_CRITICAL_THRESHOLD_PCT,
@@ -32,6 +39,8 @@ from .const import (
     DEFAULT_VAT_RATE,
     DEFAULT_WARNING_THRESHOLD_PCT,
     DOMAIN,
+    LINE_ITEM_TYPE_FIXED,
+    LINE_ITEM_TYPE_PER_KWH,
 )
 from .device_matching import resolve_power_sensors
 from .tariff_history import FrozenTariffStore, tariff_from_entry_data, tariffs_differ
@@ -389,7 +398,10 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
+            manage_line_items = user_input.pop("manage_line_items", False)
             self._data.update(user_input)
+            if manage_line_items:
+                return await self.async_step_manage_line_items()
             return await self.async_step_power()
 
         schema = vol.Schema(
@@ -409,9 +421,106 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
                     CONF_VAT_RATE, default=self._data.get(CONF_VAT_RATE, DEFAULT_VAT_RATE)
                 ): vol.Coerce(float),
                 vol.Optional(CONF_RESET_FROZEN_TARIFFS, default=False): bool,
+                vol.Optional("manage_line_items", default=False): bool,
             }
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
+
+    # ---------- Voci di tariffa avanzate: elenco con rimozione ----------
+    async def async_step_manage_line_items(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Elenca le voci di tariffa avanzate già configurate, permette
+        di rimuoverle o di aggiungerne di nuove. La modifica di una voce
+        esistente avviene invece uno alla volta (async_step_edit_line_item),
+        stesso motivo per cui i carichi si rinominano un elemento alla
+        volta: le label di campi dinamici multipli nello stesso form non
+        sono leggibili/traducibili bene in Home Assistant."""
+        current: list[dict] = list(self._data.get(CONF_TARIFF_LINE_ITEMS, []))
+
+        if user_input is not None:
+            remove_names = set(user_input.get("remove_line_items", []))
+            self._data[CONF_TARIFF_LINE_ITEMS] = [
+                item for item in current if item[CONF_LINE_ITEM_NAME] not in remove_names
+            ]
+            if user_input.get("add_new"):
+                return await self.async_step_edit_line_item()
+            return await self.async_step_power()
+
+        if not current:
+            return await self.async_step_edit_line_item()
+
+        options = [item[CONF_LINE_ITEM_NAME] for item in current]
+        schema = vol.Schema(
+            {
+                vol.Optional("remove_line_items", default=[]): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=options, multiple=True, mode="list")
+                ),
+                vol.Optional("add_new", default=False): bool,
+            }
+        )
+        return self.async_show_form(
+            step_id="manage_line_items",
+            data_schema=schema,
+            description_placeholders={"count": str(len(current))},
+        )
+
+    # ---------- Voci di tariffa avanzate: modifica/aggiunta una alla volta ----------
+    async def async_step_edit_line_item(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Aggiunge una nuova voce di tariffa avanzata. Nome, tipo
+        (per kWh o fissa mensile), valore, se applicarci sopra l'IVA, e
+        un range di mesi opzionale per voci stagionali."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            name = user_input.get(CONF_LINE_ITEM_NAME, "").strip()
+            if not name:
+                errors["base"] = "line_item_name_required"
+            else:
+                month_from = user_input.get(CONF_LINE_ITEM_MONTH_FROM) or None
+                month_to = user_input.get(CONF_LINE_ITEM_MONTH_TO) or None
+                new_item = {
+                    CONF_LINE_ITEM_NAME: name,
+                    CONF_LINE_ITEM_TYPE: user_input[CONF_LINE_ITEM_TYPE],
+                    CONF_LINE_ITEM_VALUE: user_input[CONF_LINE_ITEM_VALUE],
+                    CONF_LINE_ITEM_APPLY_VAT: user_input.get(CONF_LINE_ITEM_APPLY_VAT, True),
+                }
+                if month_from:
+                    new_item[CONF_LINE_ITEM_MONTH_FROM] = int(month_from)
+                if month_to:
+                    new_item[CONF_LINE_ITEM_MONTH_TO] = int(month_to)
+                self._data.setdefault(CONF_TARIFF_LINE_ITEMS, []).append(new_item)
+            if not errors:
+                if user_input.get("add_another"):
+                    return await self.async_step_edit_line_item()
+                return await self.async_step_manage_line_items()
+
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_LINE_ITEM_NAME): str,
+                vol.Required(
+                    CONF_LINE_ITEM_TYPE, default=LINE_ITEM_TYPE_PER_KWH
+                ): vol.In(
+                    {
+                        LINE_ITEM_TYPE_PER_KWH: "Per kWh consumato",
+                        LINE_ITEM_TYPE_FIXED: "Importo fisso mensile",
+                    }
+                ),
+                vol.Required(CONF_LINE_ITEM_VALUE, default=0.0): vol.Coerce(float),
+                vol.Optional(CONF_LINE_ITEM_APPLY_VAT, default=True): bool,
+                vol.Optional(CONF_LINE_ITEM_MONTH_FROM): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=12)
+                ),
+                vol.Optional(CONF_LINE_ITEM_MONTH_TO): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=12)
+                ),
+                vol.Optional("add_another", default=False): bool,
+            }
+        )
+        return self.async_show_form(
+            step_id="edit_line_item", data_schema=schema, errors=errors
+        )
 
     async def async_step_power(
         self, user_input: dict[str, Any] | None = None

@@ -105,7 +105,29 @@
           "fixed_monthly_cost": "Costi fissi mensili",
           "extra_charges_per_kwh": "Oneri/accise aggiuntivi (per kWh, opzionale)",
           "vat_rate": "Aliquota IVA (%)",
-          "reset_frozen_tariffs": "Reset tariffe congelate (ricalcola tutti i mesi passati con la tariffa qui sopra)"
+          "reset_frozen_tariffs": "Reset tariffe congelate (ricalcola tutti i mesi passati con la tariffa qui sopra)",
+          "manage_line_items": "Gestisci voci di tariffa avanzate (per bollette con più oneri, componenti stagionali, ecc.)"
+        }
+      },
+      "manage_line_items": {
+        "title": "Voci di tariffa avanzate ({count} presenti)",
+        "description": "Queste voci si sommano ai quattro campi sopra: usale per oneri aggiuntivi distinti, componenti stagionali (es. attive solo in certi mesi), o importi non soggetti a IVA. Seleziona quelle da rimuovere, oppure spunta 'Aggiungi una nuova voce' per crearne una.",
+        "data": {
+          "remove_line_items": "Rimuovi voci",
+          "add_new": "Aggiungi una nuova voce"
+        }
+      },
+      "edit_line_item": {
+        "title": "Nuova voce di tariffa",
+        "description": "Nome libero (es. 'Oneri di sistema', 'Contributo stagionale'). Tipo: 'Per kWh consumato' moltiplica il valore per i kWh del mese; 'Importo fisso mensile' si applica una volta a prescindere dal consumo. Il range di mesi è opzionale: lascialo vuoto per applicare la voce tutto l'anno, oppure impostalo per voci stagionali (es. da 1 a 10 per gennaio-ottobre).",
+        "data": {
+          "name": "Nome voce",
+          "type": "Tipo",
+          "value": "Valore (può essere negativo per una detrazione)",
+          "apply_vat": "Applica l'IVA configurata sopra a questa voce",
+          "month_from": "Mese iniziale (1-12, opzionale)",
+          "month_to": "Mese finale (1-12, opzionale)",
+          "add_another": "Aggiungi un'altra voce dopo questa"
         }
       },
       "power": {
@@ -128,7 +150,8 @@
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
       "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
-      "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista."
+      "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista.",
+      "line_item_name_required": "Dai un nome alla voce di tariffa."
     }
   }
 }

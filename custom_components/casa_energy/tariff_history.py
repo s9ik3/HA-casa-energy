@@ -21,8 +21,15 @@ from homeassistant.helpers.storage import Store
 from .const import (
     CONF_EXTRA_CHARGES_PER_KWH,
     CONF_FIXED_MONTHLY_COST,
+    CONF_LINE_ITEM_APPLY_VAT,
+    CONF_LINE_ITEM_MONTH_FROM,
+    CONF_LINE_ITEM_MONTH_TO,
+    CONF_LINE_ITEM_TYPE,
+    CONF_LINE_ITEM_VALUE,
     CONF_PRICE_PER_KWH,
+    CONF_TARIFF_LINE_ITEMS,
     CONF_VAT_RATE,
+    LINE_ITEM_TYPE_PER_KWH,
 )
 
 _STORAGE_VERSION = 1
@@ -83,25 +90,85 @@ class FrozenTariffStore:
 
 
 def tariff_from_entry_data(data: dict) -> dict:
-    """Estrae i quattro parametri di tariffa da ConfigEntry.data in un
+    """Estrae i parametri di tariffa da ConfigEntry.data in un
     dizionario compatto, comodo da confrontare e da salvare come
-    "congelato"."""
+    "congelato": i quattro campi semplici più le voci extra (se
+    presenti), copiate per intero così ogni mese congelato ricorda
+    esattamente quali voci erano attive quando è stato calcolato."""
     return {
         CONF_PRICE_PER_KWH: float(data.get(CONF_PRICE_PER_KWH, 0.0)),
         CONF_FIXED_MONTHLY_COST: float(data.get(CONF_FIXED_MONTHLY_COST, 0.0)),
         CONF_EXTRA_CHARGES_PER_KWH: float(data.get(CONF_EXTRA_CHARGES_PER_KWH, 0.0)),
         CONF_VAT_RATE: float(data.get(CONF_VAT_RATE, 0.0)),
+        CONF_TARIFF_LINE_ITEMS: list(data.get(CONF_TARIFF_LINE_ITEMS, [])),
     }
 
 
 def tariffs_differ(a: dict, b: dict) -> bool:
-    """Confronto numerico tollerante: evita falsi positivi per errori di
-    arrotondamento float quando in realtà l'utente non ha cambiato nulla
-    (es. riapre le Opzioni e le richiude senza toccare i valori)."""
+    """Confronto tollerante sui quattro campi numerici semplici (evita
+    falsi positivi per errori di arrotondamento float), più un confronto
+    diretto sulla lista delle voci extra: qualunque differenza lì
+    (aggiunta, rimozione, modifica di una voce) conta come cambio
+    tariffa a tutti gli effetti."""
     keys = (
         CONF_PRICE_PER_KWH,
         CONF_FIXED_MONTHLY_COST,
         CONF_EXTRA_CHARGES_PER_KWH,
         CONF_VAT_RATE,
     )
-    return any(abs(float(a.get(k, 0.0)) - float(b.get(k, 0.0))) > 1e-9 for k in keys)
+    if any(abs(float(a.get(k, 0.0)) - float(b.get(k, 0.0))) > 1e-9 for k in keys):
+        return True
+    return a.get(CONF_TARIFF_LINE_ITEMS, []) != b.get(CONF_TARIFF_LINE_ITEMS, [])
+
+
+def calculate_cost(kwh: float, month_key: str, tariff: dict) -> float:
+    """Calcola il costo di un mese a partire da kWh consumati, il mese
+    (per filtrare le voci extra stagionali) e un dizionario tariffa nel
+    formato prodotto da tariff_from_entry_data.
+
+    Replica la struttura di una bolletta reale a più voci: i quattro
+    campi semplici (prezzo energia, costi fissi, oneri, IVA) restano il
+    calcolo di base, sempre soggetti a IVA — esattamente come prima
+    dell'introduzione delle voci extra, per compatibilità con chi non le
+    usa. Le voci extra (tariff_line_items) si sommano al subtotale
+    ciascuna secondo il proprio tipo (per kWh o fissa mensile), il
+    proprio range di mesi applicabile, e la propria scelta se applicarci
+    sopra l'IVA oppure no — necessario perché in bolletta capita di avere
+    voci non soggette a IVA (es. un contributo una tantum) mescolate a
+    voci che invece lo sono."""
+    price = tariff.get(CONF_PRICE_PER_KWH, 0.0)
+    fixed_cost = tariff.get(CONF_FIXED_MONTHLY_COST, 0.0)
+    extra = tariff.get(CONF_EXTRA_CHARGES_PER_KWH, 0.0)
+    vat = tariff.get(CONF_VAT_RATE, 0.0)
+
+    base_subtotal = (kwh * price) + (kwh * extra) + fixed_cost
+
+    vat_taxable_extra = 0.0
+    vat_free_extra = 0.0
+    month_num = int(month_key.split("-")[1]) if "-" in month_key else None
+
+    for item in tariff.get(CONF_TARIFF_LINE_ITEMS, []):
+        month_from = item.get(CONF_LINE_ITEM_MONTH_FROM)
+        month_to = item.get(CONF_LINE_ITEM_MONTH_TO)
+        if month_from and month_to and month_num is not None:
+            in_range = (
+                month_from <= month_num <= month_to
+                if month_from <= month_to
+                # Range che attraversa il cambio d'anno, es. da novembre (11)
+                # a febbraio (2): l'intervallo "avvolge" dicembre/gennaio.
+                else month_num >= month_from or month_num <= month_to
+            )
+            if not in_range:
+                continue
+
+        value = float(item.get(CONF_LINE_ITEM_VALUE, 0.0))
+        amount = value * kwh if item.get(CONF_LINE_ITEM_TYPE) == LINE_ITEM_TYPE_PER_KWH else value
+
+        if item.get(CONF_LINE_ITEM_APPLY_VAT, True):
+            vat_taxable_extra += amount
+        else:
+            vat_free_extra += amount
+
+    taxable_total = base_subtotal + vat_taxable_extra
+    cost_with_vat = taxable_total * (1 + vat / 100) + vat_free_extra
+    return round(cost_with_vat, 2)

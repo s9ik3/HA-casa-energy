@@ -13,19 +13,20 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
     CONF_ENERGY_SENSORS,
-    CONF_EXTRA_CHARGES_PER_KWH,
-    CONF_FIXED_MONTHLY_COST,
     CONF_LOAD_ENERGY_ENTITY,
     CONF_LOAD_ENTITY,
     CONF_LOAD_NAME,
     CONF_LOADS,
-    CONF_PRICE_PER_KWH,
-    CONF_VAT_RATE,
     DOMAIN,
     UPDATE_INTERVAL_MINUTES,
 )
 from .device_matching import resolve_power_sensors
-from .tariff_history import FrozenTariffStore, tariff_from_entry_data, tariffs_differ
+from .tariff_history import (
+    FrozenTariffStore,
+    calculate_cost,
+    tariff_from_entry_data,
+    tariffs_differ,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -384,13 +385,7 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
             frozen = self.frozen_tariffs.get_frozen_tariff(month_key)
             tariff = frozen if frozen is not None else live_tariff
 
-            price = tariff[CONF_PRICE_PER_KWH]
-            extra = tariff[CONF_EXTRA_CHARGES_PER_KWH]
-            fixed_cost = tariff[CONF_FIXED_MONTHLY_COST]
-            vat = tariff[CONF_VAT_RATE]
-
-            cost = round((kwh * price) + (kwh * extra) + fixed_cost, 2)
-            cost_with_vat = round(cost * (1 + vat / 100), 2)
+            cost_with_vat = calculate_cost(kwh, month_key, tariff)
             months.append(
                 {
                     "mese": month_key,

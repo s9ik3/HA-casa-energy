@@ -45,27 +45,55 @@ The tariff fields (price/kWh, fixed costs, extra fees, tax rate) are internally 
 If you have a PDF or photo of your electricity bill and want to quickly work out the values to enter, you can paste this prompt (along with the document) into an AI assistant able to read documents/images (e.g. Claude, ChatGPT):
 
 ```
-Analyze this electricity bill and extract ONLY these four values,
-returning them in this exact format (numbers with a DOT as decimal
-separator, never a comma):
+Analyze this electricity bill and extract the tariff values in this
+exact format (numbers with a DOT as decimal separator, never a comma).
 
+First, decide whether the bill has a SIMPLE structure (energy + fixed
+cost + optional extra fees + a single tax rate) or a MORE ARTICULATED one
+(several distinct fee line items, seasonal/one-off components, amounts
+not subject to tax, discounts or credits). Then return:
+
+ALWAYS these four base fields:
 price_per_kwh: (energy price per kWh, net of tax — look for line items
-  like "energy charge", "supply cost", or divide the energy cost by the
-  kWh consumed in the billing period)
-fixed_monthly_cost: (sum of all fixed monthly costs not tied to
-  consumption: standing charge, capacity charge, service fee, etc. —
-  divide by the number of months covered if the bill spans more than one)
-extra_charges_per_kwh: (system charges/taxes per kWh, if listed
-  separately from the energy price; otherwise 0)
-vat_rate: (tax rate as a percentage, e.g. 10 or 22 — just the number,
-  no % symbol)
+  like "energy charge", "supply cost". If the bill has several distinct
+  energy line items, put only the main energy component here and move
+  the others to the "additional items" below)
+fixed_monthly_cost: (a SINGLE all-inclusive fixed monthly cost — if the
+  bill lists several separate fixed charges, either sum them here, or
+  list them individually as "additional items" below if you'd rather
+  keep them distinct)
+extra_charges_per_kwh: (a SINGLE system charge/tax per kWh — if there's
+  more than one, either sum them here or list them as "additional items")
+vat_rate: (main tax rate as a percentage, e.g. 10 or 22 — just the
+  number, no % symbol)
+
+ONLY IF the bill has components the four fields above can't faithfully
+represent (multiple items you want to keep distinct, seasonal/one-off
+amounts, amounts WITHOUT tax, deductions/credits), also list an
+"Additional items" table with one row per item:
+
+| Name | Type (per kWh / fixed monthly) | Value | Apply tax (yes/no) | Months (e.g. 1-10, or empty for year-round) |
+
+Use a NEGATIVE value to represent a deduction or credit.
 
 If a value can't be clearly determined from the document, write "not
 found" for that field instead of guessing, and briefly explain where you
 looked.
 ```
 
-The four values returned should be entered as-is (with a dot) in the "Tariff" configuration step. Always double-check the extracted values against the bill: the AI can misread non-standard line items or bills with multiple time-of-use rates.
+The four base values should be entered as-is (with a dot) in the "Tariff" configuration step. If the AI also returned an "Additional items" table, those rows go into the "Manage advanced tariff line items" step (see below) one at a time — name, type, value, and the two optional columns map directly to the fields requested in that step. Always double-check the extracted values against the bill: the AI can misread non-standard line items or bills with multiple time-of-use rates.
+
+### Advanced tariff line items (bills with multiple components)
+
+If your bill has a more complex structure than the four simple fields (several distinct fees, seasonal components, amounts not subject to tax, etc.), from the "Tariff" step in the Options you can check "Manage advanced tariff line items" to add as many as you need. Each item has:
+
+- A free-form **name** (e.g. "System charges", "Seasonal contribution")
+- A **type**: *per kWh consumed* (multiplied by the month's kWh) or *fixed monthly amount*
+- A **value**, which can be negative to represent a deduction/credit
+- **Apply tax**: if disabled, that item is added to the final cost without the configured tax rate applied to it
+- An optional **month range**: for seasonal items, e.g. 1 to 10 for "January-October"; left empty it applies year-round
+
+Line items are added on top of the four simple fields, not a replacement for them: if you don't add any, the calculation stays identical to before. Like the simple tariff, line items are also frozen on already-closed months when you modify them (see below).
 
 ## Changing the configuration after installation
 
@@ -128,4 +156,4 @@ The integration ships with a dedicated icon (`custom_components/casa_energy/bran
 - The monthly history is recalculated every 15 minutes using Home Assistant's native statistics API (not direct SQL queries), so it works identically on installations using SQLite, MariaDB, or PostgreSQL as the recorder database.
 - Instant power updates in real time (based on the source sensor's state-change events), not on the 15-minute interval.
 - Thresholds and tariff are per-instance: if you configure multiple instances (e.g. Home and Office), each has its own independent values.
-- **Frozen tariffs on closed months**: when you change the price, fixed costs, extra fees, or tax rate from the Options, the new tariff applies from the 1st of the current month onward; already-closed months stay fixed at the tariff they were calculated with and won't change again, even with future modifications. To reset this behavior and recalculate all past months with the current tariff, check "Reset frozen tariffs" in the Tariff step of the Options.
+- **Frozen tariffs on closed months**: when you change the price, fixed costs, extra fees, tax rate, or advanced line items from the Options, the new tariff applies from the 1st of the current month onward; already-closed months stay fixed at the tariff (including any line items) they were calculated with and won't change again, even with future modifications. To reset this behavior and recalculate all past months with the current tariff, check "Reset frozen tariffs" in the Tariff step of the Options.

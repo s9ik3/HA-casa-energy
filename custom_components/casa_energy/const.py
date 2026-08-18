@@ -11,6 +11,20 @@ CONF_FIXED_MONTHLY_COST = "fixed_monthly_cost"
 CONF_EXTRA_CHARGES_PER_KWH = "extra_charges_per_kwh"
 CONF_VAT_RATE = "vat_rate"
 
+# --- Voci di tariffa avanzate (opzionali): per bollette con struttura più
+# articolata di prezzo/costo fisso/oneri/IVA semplici (es. più oneri di
+# sistema distinti, componenti stagionali, voci senza IVA). Si sommano ai
+# quattro campi semplici sopra, non li sostituiscono. ---
+CONF_TARIFF_LINE_ITEMS = "tariff_line_items"
+CONF_LINE_ITEM_NAME = "name"
+CONF_LINE_ITEM_TYPE = "type"  # "per_kwh" oppure "fixed"
+CONF_LINE_ITEM_VALUE = "value"
+CONF_LINE_ITEM_APPLY_VAT = "apply_vat"
+CONF_LINE_ITEM_MONTH_FROM = "month_from"  # 1-12, opzionale (assente = tutto l'anno)
+CONF_LINE_ITEM_MONTH_TO = "month_to"  # 1-12, opzionale
+LINE_ITEM_TYPE_PER_KWH = "per_kwh"
+LINE_ITEM_TYPE_FIXED = "fixed"
+
 # --- Step 3: potenza istantanea ---
 CONF_TOTAL_POWER_SENSOR = "total_power_sensor"
 CONF_MAX_POWER = "max_power"
