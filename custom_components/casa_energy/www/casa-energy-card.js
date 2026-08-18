@@ -145,11 +145,12 @@ class CasaEnergyCard extends HTMLElement {
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 700;
           }
           .cec-month-title ha-icon {
             color: #42a5f5;
+            --mdc-icon-size: 20px;
           }
           .cec-month-kwh {
             font-weight: 900;
@@ -261,7 +262,7 @@ class CasaEnergyCard extends HTMLElement {
         <div class="cec-month-section">
           <div class="cec-month-header">
             <div class="cec-month-title">
-              <ha-icon icon="mdi:calendar-month" style="--mdc-icon-size:16px;"></ha-icon>
+              <ha-icon icon="mdi:calendar-month"></ha-icon>
               Mese corrente
             </div>
             <div style="text-align:right;">
