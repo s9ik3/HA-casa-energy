@@ -39,7 +39,7 @@
       },
       "tariff": {
         "title": "Tariff and power",
-        "description": "Enter your tariff details to calculate an estimated monthly cost (always double-check these values against your real bill), and your meter/system's maximum power with alert thresholds. Total instant power is calculated by summing the power sensors automatically matched to the energy sensors selected earlier. You can add more detailed tariff line items later, from the Options.",
+        "description": "Enter your base tariff details (always double-check these values against your real bill), and your meter/system's maximum power with alert thresholds. Total instant power is calculated by summing the power sensors automatically matched to the energy sensors selected earlier. In the next step you'll need to enter the detailed tariff line items (required).",
         "data": {
           "price_per_kwh": "Energy price (per kWh)",
           "fixed_monthly_cost": "Fixed monthly costs",
@@ -49,12 +49,21 @@
           "warning_threshold_pct": "Warning threshold (% of max power)",
           "critical_threshold_pct": "Critical threshold (% of max power)"
         }
+      },
+      "manage_line_items": {
+        "title": "Tariff line items",
+        "description": "Enter all your tariff items here as YAML, a list with one block per item (required: without these items the cost would be calculated using only the four fields from the previous step, which usually stay at 0). Fields for each item: name (free-form), type (per_kwh, fixed, or per_kw_power), value (a number, can be negative for a deduction), apply_vat (true/false, optional, defaults to true), engaged_power_kw (required only for type per_kw_power), month_from and month_to (1-12, optional, for seasonal items). If you have a bill, you can use the AI prompt suggested in the documentation to generate this block automatically.\n\nExample:\n\n{example}\n\n{error_detail}",
+        "data": {
+          "line_items_yaml": "Tariff line items (YAML)"
+        }
       }
     },
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
       "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
-      "duplicate_entity": "This sensor has already been added to this list."
+      "duplicate_entity": "This sensor has already been added to this list.",
+      "line_items_required": "{error_detail}",
+      "line_items_invalid": "The text isn't valid: {error_detail}"
     },
     "abort": {
       "already_configured": "This instance is already configured."
@@ -105,7 +114,7 @@
       },
       "manage_line_items": {
         "title": "Advanced tariff line items",
-        "description": "Paste all your items here as YAML, a list with one block per item. Fields for each item: name (free-form), type (per_kwh, fixed, or per_kw_power), value (a number, can be negative for a deduction), apply_vat (true/false, optional, defaults to true), engaged_power_kw (required only for type per_kw_power), month_from and month_to (1-12, optional, for seasonal items). Leave the field empty to have no advanced items.\n\n{preview}\n\nExample:\n\n{example}\n\n{error_detail}",
+        "description": "Paste all your tariff items here as YAML, a list with one block per item (required: without these items the cost would be calculated using only the four fields from the previous step, which usually stay at 0). Fields for each item: name (free-form), type (per_kwh, fixed, or per_kw_power), value (a number, can be negative for a deduction), apply_vat (true/false, optional, defaults to true), engaged_power_kw (required only for type per_kw_power), month_from and month_to (1-12, optional, for seasonal items).\n\n{preview}\n\nExample:\n\n{example}\n\n{error_detail}",
         "data": {
           "line_items_yaml": "Tariff line items (YAML)",
           "reference_cost": "Reference cost from the bill (optional, to check the gap before saving)",
@@ -133,6 +142,7 @@
       "no_energy_sensors": "Select at least one energy sensor.",
       "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
       "duplicate_entity": "This sensor has already been added to this list.",
+      "line_items_required": "{error_detail}",
       "line_items_invalid": "The text isn't valid: {error_detail}",
       "cost_mismatch": "{error_detail}",
       "reference_month_not_found": "{error_detail}"

@@ -39,7 +39,7 @@
       },
       "tariff": {
         "title": "Tariffa e potenza",
-        "description": "Inserisci i dati della tua tariffa per calcolare una stima del costo mensile (verifica sempre questi valori con la tua bolletta reale), e la potenza massima del tuo contatore/impianto con le soglie di allerta. La potenza istantanea totale è calcolata sommando i sensori power abbinati automaticamente ai sensori energy selezionati in precedenza. Potrai aggiungere voci di tariffa più dettagliate in seguito, dalle Opzioni.",
+        "description": "Inserisci i dati base della tua tariffa (verifica sempre questi valori con la tua bolletta reale), e la potenza massima del tuo contatore/impianto con le soglie di allerta. La potenza istantanea totale è calcolata sommando i sensori power abbinati automaticamente ai sensori energy selezionati in precedenza. Nel passaggio successivo dovrai inserire le voci dettagliate della tariffa (obbligatorio).",
         "data": {
           "price_per_kwh": "Prezzo energia (per kWh)",
           "fixed_monthly_cost": "Costi fissi mensili",
@@ -49,12 +49,21 @@
           "warning_threshold_pct": "Soglia attenzione (% della potenza massima)",
           "critical_threshold_pct": "Soglia critica (% della potenza massima)"
         }
+      },
+      "manage_line_items": {
+        "title": "Voci di tariffa",
+        "description": "Inserisci qui tutte le voci della tua tariffa in formato YAML, una lista con un blocco per voce (campo obbligatorio: senza queste voci il costo verrebbe calcolato usando solo i quattro campi dello step precedente, che di norma restano a 0). Campi per ogni voce: name (nome libero), type (per_kwh, fixed, oppure per_kw_power), value (numero, può essere negativo per una detrazione), apply_vat (true/false, opzionale, default true), engaged_power_kw (richiesto solo per type per_kw_power), month_from e month_to (1-12, opzionali, per voci stagionali). Se hai una bolletta, puoi usare il prompt IA suggerito nella documentazione per generare questo blocco automaticamente.\n\nEsempio:\n\n{example}\n\n{error_detail}",
+        "data": {
+          "line_items_yaml": "Voci di tariffa (YAML)"
+        }
       }
     },
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
       "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
-      "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista."
+      "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista.",
+      "line_items_required": "{error_detail}",
+      "line_items_invalid": "Il testo non è valido: {error_detail}"
     },
     "abort": {
       "already_configured": "Questa istanza è già configurata."
@@ -105,7 +114,7 @@
       },
       "manage_line_items": {
         "title": "Voci di tariffa avanzate",
-        "description": "Incolla qui tutte le voci in formato YAML, una lista con un blocco per voce. Campi per ogni voce: name (nome libero), type (per_kwh, fixed, oppure per_kw_power), value (numero, può essere negativo per una detrazione), apply_vat (true/false, opzionale, default true), engaged_power_kw (richiesto solo per type per_kw_power), month_from e month_to (1-12, opzionali, per voci stagionali). Lascia il campo vuoto per non avere voci avanzate.\n\n{preview}\n\nEsempio:\n\n{example}\n\n{error_detail}",
+        "description": "Incolla qui tutte le voci della tua tariffa in formato YAML, una lista con un blocco per voce (campo obbligatorio: senza queste voci il costo verrebbe calcolato usando solo i quattro campi dello step precedente, che di norma restano a 0). Campi per ogni voce: name (nome libero), type (per_kwh, fixed, oppure per_kw_power), value (numero, può essere negativo per una detrazione), apply_vat (true/false, opzionale, default true), engaged_power_kw (richiesto solo per type per_kw_power), month_from e month_to (1-12, opzionali, per voci stagionali).\n\n{preview}\n\nEsempio:\n\n{example}\n\n{error_detail}",
         "data": {
           "line_items_yaml": "Voci di tariffa (YAML)",
           "reference_cost": "Costo di riferimento dalla bolletta (opzionale, per verificare lo scarto prima di salvare)",
@@ -133,6 +142,7 @@
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
       "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
       "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista.",
+      "line_items_required": "{error_detail}",
       "line_items_invalid": "Il testo non è valido: {error_detail}",
       "cost_mismatch": "{error_detail}",
       "reference_month_not_found": "{error_detail}"

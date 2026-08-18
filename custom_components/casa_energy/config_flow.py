@@ -261,9 +261,7 @@ class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, doma
         errors: dict[str, str] = {}
         if user_input is not None:
             self._data.update(user_input)
-            return self.async_create_entry(
-                title=self._data[CONF_INSTANCE_NAME], data=self._data
-            )
+            return await self.async_step_manage_line_items()
 
         schema = vol.Schema(
             {
@@ -281,6 +279,11 @@ class CasaEnergyConfigFlow(_DeviceMatchingMixin, config_entries.ConfigFlow, doma
             }
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
+
+    async def _continue_after_line_items(self) -> config_entries.ConfigFlowResult:
+        return self.async_create_entry(
+            title=self._data[CONF_INSTANCE_NAME], data=self._data
+        )
 
     @staticmethod
     @callback
@@ -398,11 +401,8 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            manage_line_items = user_input.pop("manage_line_items", False)
             self._data.update(user_input)
-            if manage_line_items:
-                return await self.async_step_manage_line_items()
-            return await self.async_step_power()
+            return await self.async_step_manage_line_items()
 
         schema = vol.Schema(
             {
@@ -421,12 +421,18 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
                     CONF_VAT_RATE, default=self._data.get(CONF_VAT_RATE, DEFAULT_VAT_RATE)
                 ): vol.Coerce(float),
                 vol.Optional(CONF_RESET_FROZEN_TARIFFS, default=False): bool,
-                vol.Optional("manage_line_items", default=False): bool,
             }
         )
         return self.async_show_form(step_id="tariff", data_schema=schema, errors=errors)
 
+    async def _continue_after_line_items(self) -> config_entries.ConfigFlowResult:
+        return await self.async_step_power()
+
     # ---------- Voci di tariffa avanzate: blocco YAML unico ----------
+    # Nel mixin (non nella sola OptionsFlow) perché ora è un passaggio
+    # obbligatorio sia nel setup iniziale sia nelle Opzioni: senza queste
+    # voci il calcolo userebbe solo i 4 campi base, che di norma restano
+    # a 0 e producono un costo palesemente sbagliato senza alcun avviso.
     async def async_step_manage_line_items(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
@@ -438,87 +444,113 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         visibile, o una voce restare fuori senza che l'utente se ne
         accorgesse subito. Un blocco unico permette anche di preparare
         l'elenco con l'aiuto di un assistente IA a cui si è data la
-        bolletta, e di vedere/correggere tutto in un solo posto."""
+        bolletta, e di vedere/correggere tutto in un solo posto.
+
+        Il campo è obbligatorio: senza almeno una voce, la tariffa
+        risulterebbe silenziosamente basata solo sui 4 campi base (che
+        restano a 0 salvo che l'utente li compili a mano), producendo un
+        costo mensile palesemente sbagliato senza nessun avviso."""
         errors: dict[str, str] = {}
         current_yaml = line_items_to_yaml(self._data.get(CONF_TARIFF_LINE_ITEMS, []))
         error_detail = ""
 
+        # entry_id esiste solo nelle Opzioni (la ConfigEntry è già stata
+        # creata): nel setup iniziale non c'è ancora un coordinator da
+        # interrogare, quindi anteprima e verifica di riferimento restano
+        # semplicemente disattivate finché l'istanza non esiste.
+        entry_id = getattr(self, "_config_entry", None)
+        entry_id = entry_id.entry_id if entry_id is not None else None
+
         if user_input is not None:
             raw_text = user_input.get("line_items_yaml", "")
             reference_cost = user_input.get("reference_cost")
-            try:
-                new_items = parse_line_items_yaml(raw_text)
-            except LineItemsParseError as err:
-                errors["base"] = "line_items_invalid"
-                current_yaml = raw_text
-                error_detail = str(err)
+            if not raw_text.strip():
+                errors["base"] = "line_items_required"
+                error_detail = (
+                    "Inserisci almeno una voce: senza queste, il costo verrebbe "
+                    "calcolato solo con i quattro campi base dello step precedente "
+                    "(spesso lasciati a 0), producendo una stima palesemente sbagliata."
+                )
             else:
-                # Se l'utente ha indicato un costo di riferimento (es. il
-                # totale esatto della bolletta), verifichiamo che il
-                # calcolo con le voci appena inserite ci si avvicini
-                # abbastanza PRIMA di salvare: uno scarto ampio (oltre il
-                # 5%) è quasi sempre segno di una voce con il coefficiente
-                # sbagliato o mancante, non di un normale arrotondamento
-                # — meglio segnalarlo subito che scoprirlo dopo aver
-                # salvato, come già successo controllando a mano contro
-                # la card. Il mese di riferimento è opzionale: se la
-                # bolletta guardata per compilare le voci non è quella
-                # del mese corrente (es. si sta configurando l'integrazione
-                # usando una bolletta più vecchia come esempio), va
-                # indicato esplicitamente — altrimenti il confronto
-                # userebbe i kWh del mese sbagliato, dando un falso
-                # allarme o un falso "va tutto bene".
-                if reference_cost:
-                    coordinator = self.hass.data.get(DOMAIN, {}).get(
-                        self._config_entry.entry_id
-                    )
-                    mesi = (coordinator.data or {}).get("mesi", []) if coordinator else []
-                    now = datetime.now()
-                    reference_month_input = (user_input.get("reference_month") or "").strip()
-                    target_month_key = reference_month_input or f"{now.year}-{now.month:02d}"
-                    target_month = next(
-                        (m for m in mesi if m["mese"] == target_month_key), None
-                    )
-                    if target_month is None:
-                        errors["base"] = "reference_month_not_found"
-                        current_yaml = raw_text
-                        available = ", ".join(m["mese"] for m in mesi) or "nessuno"
-                        error_detail = (
-                            f"Nessuno storico trovato per il mese '{target_month_key}'. "
-                            f"Mesi disponibili: {available}."
+                try:
+                    new_items = parse_line_items_yaml(raw_text)
+                except LineItemsParseError as err:
+                    errors["base"] = "line_items_invalid"
+                    current_yaml = raw_text
+                    error_detail = str(err)
+                else:
+                    # Se l'utente ha indicato un costo di riferimento (es. il
+                    # totale esatto della bolletta), verifichiamo che il
+                    # calcolo con le voci appena inserite ci si avvicini
+                    # abbastanza PRIMA di salvare: uno scarto ampio (oltre il
+                    # 5%) è quasi sempre segno di una voce con il coefficiente
+                    # sbagliato o mancante, non di un normale arrotondamento
+                    # — meglio segnalarlo subito che scoprirlo dopo aver
+                    # salvato, come già successo controllando a mano contro
+                    # la card. Il mese di riferimento è opzionale: se la
+                    # bolletta guardata per compilare le voci non è quella
+                    # del mese corrente (es. si sta configurando l'integrazione
+                    # usando una bolletta più vecchia come esempio), va
+                    # indicato esplicitamente — altrimenti il confronto
+                    # userebbe i kWh del mese sbagliato, dando un falso
+                    # allarme o un falso "va tutto bene". Disponibile solo
+                    # nelle Opzioni, dove esiste già uno storico calcolato.
+                    if reference_cost and entry_id:
+                        coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
+                        mesi = (coordinator.data or {}).get("mesi", []) if coordinator else []
+                        now = datetime.now()
+                        reference_month_input = (
+                            user_input.get("reference_month") or ""
+                        ).strip()
+                        target_month_key = (
+                            reference_month_input or f"{now.year}-{now.month:02d}"
                         )
-                    elif target_month.get("insufficient_data"):
-                        errors["base"] = "reference_month_not_found"
-                        current_yaml = raw_text
-                        error_detail = (
-                            f"Il mese '{target_month_key}' non ha ancora dati sufficienti "
-                            "per un confronto affidabile. Scegli un altro mese, o lascia "
-                            "vuoto il costo di riferimento."
+                        target_month = next(
+                            (m for m in mesi if m["mese"] == target_month_key), None
                         )
-                    else:
-                        trial_tariff = tariff_from_entry_data(
-                            {**self._data, CONF_TARIFF_LINE_ITEMS: new_items}
-                        )
-                        trial_cost = calculate_cost(
-                            target_month["kwh"], target_month_key, trial_tariff
-                        )
-                        diff_pct = abs(trial_cost - reference_cost) / reference_cost * 100
-                        if diff_pct > 5:
-                            errors["base"] = "cost_mismatch"
+                        if target_month is None:
+                            errors["base"] = "reference_month_not_found"
+                            current_yaml = raw_text
+                            available = ", ".join(m["mese"] for m in mesi) or "nessuno"
+                            error_detail = (
+                                f"Nessuno storico trovato per il mese '{target_month_key}'. "
+                                f"Mesi disponibili: {available}."
+                            )
+                        elif target_month.get("insufficient_data"):
+                            errors["base"] = "reference_month_not_found"
                             current_yaml = raw_text
                             error_detail = (
-                                f"Mese {target_month_key}: calcolato ~ € {trial_cost} "
-                                f"({target_month['kwh']} kWh) contro un riferimento di "
-                                f"€ {reference_cost} (scarto {round(diff_pct, 1)}%). "
-                                "Controlla se manca una voce o se un valore è sbagliato. "
-                                "Se lo scarto è voluto (es. il riferimento include servizi "
-                                "extra come un canone), invia di nuovo lasciando vuoto il "
-                                "campo 'Costo di riferimento' per salvare comunque."
+                                f"Il mese '{target_month_key}' non ha ancora dati "
+                                "sufficienti per un confronto affidabile. Scegli un "
+                                "altro mese, o lascia vuoto il costo di riferimento."
                             )
+                        else:
+                            trial_tariff = tariff_from_entry_data(
+                                {**self._data, CONF_TARIFF_LINE_ITEMS: new_items}
+                            )
+                            trial_cost = calculate_cost(
+                                target_month["kwh"], target_month_key, trial_tariff
+                            )
+                            diff_pct = (
+                                abs(trial_cost - reference_cost) / reference_cost * 100
+                            )
+                            if diff_pct > 5:
+                                errors["base"] = "cost_mismatch"
+                                current_yaml = raw_text
+                                error_detail = (
+                                    f"Mese {target_month_key}: calcolato ~ € {trial_cost} "
+                                    f"({target_month['kwh']} kWh) contro un riferimento di "
+                                    f"€ {reference_cost} (scarto {round(diff_pct, 1)}%). "
+                                    "Controlla se manca una voce o se un valore è "
+                                    "sbagliato. Se lo scarto è voluto (es. il riferimento "
+                                    "include servizi extra come un canone), invia di "
+                                    "nuovo lasciando vuoto il campo 'Costo di "
+                                    "riferimento' per salvare comunque."
+                                )
 
-                if not errors:
-                    self._data[CONF_TARIFF_LINE_ITEMS] = new_items
-                    return await self.async_step_power()
+                    if not errors:
+                        self._data[CONF_TARIFF_LINE_ITEMS] = new_items
+                        return await self._continue_after_line_items()
 
         # Anteprima: applica la tariffa (4 campi base + voci salvate finora)
         # al consumo del mese in corso già calcolato dal coordinator, così
@@ -527,34 +559,42 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         # la card. Calcolata sui dati SALVATI (non su un tentativo appena
         # fallito): un solo invio resta sufficiente per confermare, senza
         # aggiungere un passaggio extra di "conferma dopo anteprima".
+        # Disponibile solo nelle Opzioni (serve uno storico già calcolato).
         preview = ""
-        coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
-        if coordinator:
-            mesi = (coordinator.data or {}).get("mesi", [])
-            now = datetime.now()
-            current_month_key = f"{now.year}-{now.month:02d}"
-            current_month = next((m for m in mesi if m["mese"] == current_month_key), None)
-            if current_month and not current_month.get("insufficient_data"):
-                preview_tariff = tariff_from_entry_data(self._data)
-                preview_cost = calculate_cost(
-                    current_month["kwh"], current_month_key, preview_tariff
+        if entry_id:
+            coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
+            if coordinator:
+                mesi = (coordinator.data or {}).get("mesi", [])
+                now = datetime.now()
+                current_month_key = f"{now.year}-{now.month:02d}"
+                current_month = next(
+                    (m for m in mesi if m["mese"] == current_month_key), None
                 )
-                preview = (
-                    f"Con la tariffa attualmente salvata: "
-                    f"{current_month['kwh']} kWh del mese corrente → ~ € {preview_cost}"
-                )
-
-        schema = vol.Schema(
-            {
-                vol.Optional("line_items_yaml", default=current_yaml): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        multiline=True, type=selector.TextSelectorType.TEXT
+                if current_month and not current_month.get("insufficient_data"):
+                    preview_tariff = tariff_from_entry_data(self._data)
+                    preview_cost = calculate_cost(
+                        current_month["kwh"], current_month_key, preview_tariff
                     )
-                ),
-                vol.Optional("reference_cost"): vol.Coerce(float),
-                vol.Optional("reference_month"): str,
-            }
-        )
+                    preview = (
+                        f"Con la tariffa attualmente salvata: "
+                        f"{current_month['kwh']} kWh del mese corrente → ~ € {preview_cost}"
+                    )
+
+        schema_dict = {
+            vol.Required("line_items_yaml", default=current_yaml): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    multiline=True, type=selector.TextSelectorType.TEXT
+                )
+            ),
+        }
+        # I campi di riferimento hanno senso solo se esiste già uno
+        # storico da confrontare (Opzioni): nel setup iniziale la
+        # ConfigEntry non è ancora stata creata, quindi non c'è alcun
+        # consumo calcolato con cui verificare lo scarto.
+        if entry_id:
+            schema_dict[vol.Optional("reference_cost")] = vol.Coerce(float)
+            schema_dict[vol.Optional("reference_month")] = str
+        schema = vol.Schema(schema_dict)
         return self.async_show_form(
             step_id="manage_line_items",
             data_schema=schema,
@@ -565,6 +605,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
                 "preview": preview,
             },
         )
+
 
     async def async_step_power(
         self, user_input: dict[str, Any] | None = None

@@ -31,7 +31,8 @@ Dopo l'installazione e il riavvio:
 2. Segui gli step guidati:
    - **Nome istanza**: un'etichetta per questa configurazione (utile se in futuro vuoi tracciare più contatori/case separatamente)
    - **Sensori energy**: seleziona uno o più sensori con `device_class: energy` di cui vuoi lo storico. Questi sono i dispositivi che concorrono al calcolo del totale della potenza istantanea. Il sensore di potenza (Watt) dello stesso dispositivo viene individuato **automaticamente** (stesso device Home Assistant): non serve selezionarlo di nuovo. Se un dispositivo ha più sensori di potenza, ti verrà chiesto quale usare; se non ne ha nessuno, un avviso bloccante te lo segnala (con possibilità di procedere comunque accettando che quel dispositivo non venga conteggiato)
-   - **Tariffa e potenza**: prezzo energia (€/kWh), costi fissi mensili, eventuali oneri aggiuntivi, aliquota IVA (verifica sempre questi valori con la tua bolletta reale), più potenza massima del tuo contatore/impianto e soglie di allerta — tutto in un unico step. Se la tua bolletta ha una struttura più articolata, potrai aggiungere voci di tariffa dettagliate in seguito dalle Opzioni (vedi sotto)
+   - **Tariffa e potenza**: prezzo energia (€/kWh), costi fissi mensili, eventuali oneri aggiuntivi, aliquota IVA (verifica sempre questi valori con la tua bolletta reale), più potenza massima del tuo contatore/impianto e soglie di allerta — tutto in un unico step
+   - **Voci di tariffa**: un blocco YAML con le voci dettagliate della tua bolletta (vedi sotto) — **obbligatorio**: senza queste voci, il costo mensile verrebbe calcolato usando solo i quattro campi dello step precedente, che di norma restano a 0 e produrrebbero una stima palesemente sbagliata
 
 Se vuoi mostrare in card anche dispositivi che **non** devono contare nel totale (es. un dispositivo già incluso in un carico aggregato, o semplicemente qualcosa che vuoi solo monitorare a colpo d'occhio), si aggiungono direttamente dall'editor della card — vedi sotto.
 
@@ -90,9 +91,9 @@ voce e segnalalo a parte, invece di inventare un numero.
 
 I tre campi base vanno lasciati a 0 nello step "Tariffa" (solo l'IVA va compilata), e il blocco YAML restituito dall'IA va incollato per intero nel campo "Voci di tariffa (YAML)" dello step successivo (vedi sotto). Ricontrolla sempre i valori estratti confrontandoli con la bolletta: l'IA può interpretare male voci non standard o bollette con più fasce orarie.
 
-### Voci di tariffa avanzate (bollette con più componenti)
+### Voci di tariffa (obbligatorio)
 
-Se la tua bolletta ha una struttura più complessa dei quattro campi semplici (più oneri distinti, componenti stagionali, importi non soggetti a IVA, ecc.), dallo step "Tariffa" delle Opzioni spunta "Gestisci voci di tariffa avanzate": si apre un campo di testo dove incolli **tutte le voci in un colpo solo**, come YAML — una lista con un blocco per voce:
+Questo step (parte del setup iniziale, e raggiungibile in ogni momento dalle Opzioni tramite lo step "Tariffa") ti chiede di incollare **tutte le voci della tua tariffa in un colpo solo**, come YAML — una lista con un blocco per voce:
 
 ```yaml
 - name: Consumo energia
@@ -122,10 +123,12 @@ Campi per voce:
 - **type**: `per_kwh` (moltiplicato per i kWh del mese), `fixed` (importo fisso mensile), oppure `per_kw_power` (moltiplicato per la potenza impegnata — utile per componenti come la quota potenza del trasporto, calcolate sui kW e non sui kWh)
 - **value**: può essere negativo, per rappresentare una detrazione/credito
 - **engaged_power_kw**: richiesto solo per il tipo `per_kw_power`
-- **apply_vat**: `false` per escludere quella voce dall'IVA configurata sopra; se omesso, l'IVA si applica (default `true`)
+- **apply_vat**: `false` per escludere quella voce dall'IVA configurata nello step precedente; se omesso, l'IVA si applica (default `true`)
 - **month_from** / **month_to**: opzionali, 1-12, per voci stagionali attive solo in certi mesi; se omessi la voce si applica tutto l'anno
 
-Se il testo incollato non è YAML valido o manca un campo obbligatorio, lo step segnala l'errore specifico (quale voce e quale campo) invece di far sparire silenziosamente una voce. Lascia il campo vuoto per non avere voci avanzate — riapri lo step in qualsiasi momento per vedere e modificare quelle già salvate, precompilate automaticamente. Le voci extra si sommano ai quattro campi semplici, non li sostituiscono. Come per la tariffa semplice, anche le voci extra vengono congelate sui mesi già chiusi quando le modifichi (vedi sotto).
+Il campo è **obbligatorio**: se lo lasci vuoto, il salvataggio viene bloccato con una spiegazione — senza almeno una voce, il costo verrebbe calcolato usando solo i quattro campi base (prezzo/costo fisso/oneri/IVA), che di norma restano a 0 e produrrebbero una stima palesemente sbagliata senza alcun avviso. Se hai davvero una tariffa semplicissima con un solo prezzo per kWh e un unico costo fisso, scrivi comunque due voci minime (`type: per_kwh` e `type: fixed`) invece di lasciare il campo vuoto.
+
+Se il testo incollato non è YAML valido o manca un campo obbligatorio, lo step segnala l'errore specifico (quale voce e quale campo) invece di far sparire silenziosamente una voce. Riapri lo step in qualsiasi momento per vedere e modificare le voci già salvate, precompilate automaticamente. Come per la tariffa semplice, le voci vengono congelate sui mesi già chiusi quando le modifichi (vedi sotto).
 
 Lo step mostra anche un'**anteprima del costo**: applica la tariffa attualmente salvata al consumo del mese in corso, così puoi verificare subito se il totale torna prima ancora di modificare qualcosa — utile per controllare i risultati di un cambiamento appena fatto senza dover uscire e guardare la card.
 
