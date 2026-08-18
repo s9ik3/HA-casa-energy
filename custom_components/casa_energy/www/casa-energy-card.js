@@ -126,6 +126,11 @@ class CasaEnergyCard extends HTMLElement {
             text-overflow: ellipsis;
             white-space: nowrap;
           }
+          .cec-chip-value {
+            font-weight: 700;
+            color: var(--primary-text-color, #fff);
+            white-space: nowrap;
+          }
           .cec-month-section {
             margin-top: 12px;
             padding-top: 10px;
@@ -140,18 +145,25 @@ class CasaEnergyCard extends HTMLElement {
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
           }
+          .cec-month-title ha-icon {
+            color: #42a5f5;
+          }
           .cec-month-kwh {
-            font-weight: 800;
-            font-size: 18px;
+            font-weight: 900;
+            font-size: 16px;
+            color: #42a5f5;
             text-align: right;
+            line-height: 1;
           }
           .cec-month-cost {
             font-size: 11px;
-            opacity: 0.65;
+            font-weight: 700;
+            color: var(--secondary-text-color);
             text-align: right;
+            margin-top: 2px;
           }
           .cec-month-bar-track {
             height: 6px;
@@ -214,6 +226,16 @@ class CasaEnergyCard extends HTMLElement {
             font-size: 11px;
             opacity: 0.5;
           }
+          .cec-critical-notice {
+            margin-top: 10px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #e53935;
+            background: rgba(229,57,53,0.08);
+            border: 1px solid rgba(229,57,53,0.18);
+          }
         </style>
         <div class="cec-top">
           <div class="cec-title-row">
@@ -228,6 +250,9 @@ class CasaEnergyCard extends HTMLElement {
         </div>
         <div class="cec-bar-track">
           <div class="cec-bar-fill" id="cec-bar-fill" style="width:0%;"></div>
+        </div>
+        <div class="cec-critical-notice" id="cec-critical-notice" style="display:none;">
+          Vicino al limite del contatore
         </div>
         <div class="cec-loads" id="cec-loads"></div>
         <div class="cec-month-section">
@@ -256,6 +281,7 @@ class CasaEnergyCard extends HTMLElement {
     this._percentEl = this.shadowRoot.querySelector("#cec-percent");
     this._barFill = this.shadowRoot.querySelector("#cec-bar-fill");
     this._badge = this.shadowRoot.querySelector("#cec-badge");
+    this._criticalNotice = this.shadowRoot.querySelector("#cec-critical-notice");
     this._loadsEl = this.shadowRoot.querySelector("#cec-loads");
     this._monthKwhEl = this.shadowRoot.querySelector("#cec-month-kwh");
     this._monthCostEl = this.shadowRoot.querySelector("#cec-month-cost");
@@ -346,15 +372,17 @@ class CasaEnergyCard extends HTMLElement {
         this._badge.style.display = "inline-block";
         this._badge.style.background = "#e5393522";
         this._badge.style.color = "#e53935";
+        this._criticalNotice.style.display = "block";
       } else {
         this._badge.style.display = "none";
+        this._criticalNotice.style.display = "none";
       }
 
       const loads = attrs.loads || [];
       const chip = (l) => `
         <div class="cec-load-chip">
           <span class="cec-chip-name">${l.name}</span>
-          <span class="cec-chip-value" style="font-weight:700;color:${color};">${
+          <span class="cec-chip-value">${
             l.value == null ? "N/A" : Math.round(l.value) + " W"
           }</span>
         </div>
@@ -413,13 +441,16 @@ class CasaEnergyCard extends HTMLElement {
           corr && corr.costo != null ? `~ € ${corr.costo.toFixed(2)}` : "";
       }
 
-      // La barra mostra quanti giorni del mese sono già trascorsi: dà
-      // un riferimento visivo di "a che punto siamo" nel ciclo di
-      // fatturazione corrente, coerente con lo stile a barra già usato
-      // altrove nella card.
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      const dayProgress = Math.round((now.getDate() / daysInMonth) * 100);
-      this._monthBarFill.style.width = `${Math.max(0, Math.min(100, dayProgress))}%`;
+      // La barra mostra il consumo del mese corrente in proporzione al
+      // massimo kWh registrato tra tutti i mesi in storico: dà un
+      // riferimento visivo di quanto il mese in corso sia "pieno"
+      // rispetto al picco storico, invece che ai giorni trascorsi.
+      const maxKwh = mesi.length
+        ? Math.max(...mesi.map((m) => Number(m.kwh) || 0), 0.001)
+        : 1;
+      const monthProgress =
+        corr && corr.kwh != null ? Math.round((corr.kwh / maxKwh) * 100) : 0;
+      this._monthBarFill.style.width = `${Math.max(0, Math.min(100, monthProgress))}%`;
 
       const passatiCount = mesi.filter((m) => m.mese !== ymCorr).length;
       this._historyToggleLabel.textContent = this._historyOpen

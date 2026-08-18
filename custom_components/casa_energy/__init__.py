@@ -291,8 +291,10 @@ class MonthlyEnergyCoordinator(DataUpdateCoordinator):
         extra = float(data.get(CONF_EXTRA_CHARGES_PER_KWH, 0.0))
         vat = float(data.get(CONF_VAT_RATE, 0.0))
 
-        # Vai indietro fino a 13 mesi fa per avere storico + mese corrente
-        start = (datetime.now() - timedelta(days=400)).replace(
+        # Vai indietro fino a 24 mesi fa (+ margine di un mese per
+        # includere per intero il primo mese della finestra) per avere
+        # storico esteso + mese corrente.
+        start = (datetime.now() - timedelta(days=760)).replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         )
 
