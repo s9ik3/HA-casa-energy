@@ -136,12 +136,21 @@
         "data": {
           "name": "Nome carico"
         }
+      },
+      "tariff_period": {
+        "title": "Periodo della tariffa precedente",
+        "description": "Hai modificato la tariffa. Indica da quale a quale mese era in vigore quella appena sostituita (formato AAAA-MM, es. 2026-06): i mesi in questo intervallo useranno quella tariffa invece di quella nuova, anche in futuro. Se la tariffa precedente valeva solo per l'ultimo mese chiuso, imposta lo stesso mese in entrambi i campi.",
+        "data": {
+          "month_from": "Mese iniziale (AAAA-MM)",
+          "month_to": "Mese finale (AAAA-MM)"
+        }
       }
     },
     "error": {
       "no_energy_sensors": "Seleziona almeno un sensore energy.",
       "unmatched_power_sensors": "Alcuni dispositivi non hanno un sensore di potenza abbinato. Spunta la casella per procedere comunque, oppure rivedi la selezione dei sensori energy.",
       "duplicate_entity": "Questo sensore è già stato aggiunto in questa lista.",
+      "invalid_month_format": "Formato non valido: usa AAAA-MM, es. 2026-06.",
       "line_items_required": "{error_detail}",
       "line_items_invalid": "Il testo non è valido: {error_detail}",
       "cost_mismatch": "{error_detail}",

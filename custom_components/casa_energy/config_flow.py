@@ -312,6 +312,7 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         self._match_unmatched: dict[str, str] = {}
         self._confirm_queue: list[str] | None = None
         self._rename_loads_queue: list[int] | None = None
+        self._pending_old_tariff: dict | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -329,37 +330,85 @@ class CasaEnergyOptionsFlow(_DeviceMatchingMixin, config_entries.OptionsFlow):
         confronto con i dati precedenti fa scattare l'update_listener
         (già registrato in __init__.py) che ricarica l'integrazione.
 
-        Prima del salvataggio, se la tariffa è cambiata rispetto a quella
-        finora in vigore (self._config_entry.data contiene ancora i
-        valori vecchi in questo momento), congela quella vecchia tariffa
-        su tutti i mesi già chiusi: da qui in poi quei mesi non seguiranno
-        più eventuali modifiche future, restando fissi a quanto erano
-        stati fatturati davvero."""
+        Se la tariffa è cambiata rispetto a quella finora in vigore, non
+        salviamo subito: prima chiediamo all'utente il periodo esatto in
+        cui era valida la tariffa appena sostituita (async_step_tariff_period),
+        perché ogni mese chiuso può aver avuto una tariffa diversa dagli
+        altri (le componenti come Cdispd/ARIM/ASOS cambiano di bolletta in
+        bolletta) — un singolo blob "congela tutto il passato" non basta
+        a rappresentarlo correttamente."""
         old_tariff = tariff_from_entry_data(self._config_entry.data)
         new_tariff = tariff_from_entry_data(self._data)
 
-        # Usiamo la STESSA istanza di FrozenTariffStore già in mano al
-        # coordinator (non una nuova temporanea): quella ha una cache in
-        # memoria propria, e scrivere/resettare tramite un'istanza
-        # diversa lascia la cache del coordinator disallineata dal
-        # disco finché non arriva un riavvio completo — il coordinator
-        # continuerebbe a leggere i vecchi dati fino ad allora.
-        coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
-        store = coordinator.frozen_tariffs if coordinator else FrozenTariffStore(
-            self.hass, self._config_entry.entry_id
-        )
-
         if self._data.pop(CONF_RESET_FROZEN_TARIFFS, False):
+            coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+            store = coordinator.frozen_tariffs if coordinator else FrozenTariffStore(
+                self.hass, self._config_entry.entry_id
+            )
             await store.async_reset()
-        elif tariffs_differ(old_tariff, new_tariff):
-            mesi = (coordinator.data or {}).get("mesi", []) if coordinator else []
-            now = datetime.now()
-            current_month_key = f"{now.year}-{now.month:02d}"
-            closed_months = [m["mese"] for m in mesi if m["mese"] != current_month_key]
-            await store.async_freeze_previous_tariff(closed_months, old_tariff)
+            return await self._async_finish_save()
 
+        if tariffs_differ(old_tariff, new_tariff):
+            self._pending_old_tariff = old_tariff
+            return await self.async_step_tariff_period()
+
+        return await self._async_finish_save()
+
+    async def _async_finish_save(self) -> config_entries.ConfigFlowResult:
         self.hass.config_entries.async_update_entry(self._config_entry, data=self._data)
         return self.async_create_entry(title="", data={})
+
+    # ---------- Periodo di validità della tariffa appena sostituita ----------
+    async def async_step_tariff_period(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Chiede da quale a quale mese era in vigore la tariffa appena
+        sostituita, prima di registrarla come periodo storico. Il
+        default proposto copre dal mese successivo all'ultimo periodo
+        già registrato (o dal primo mese disponibile nello storico
+        consumi, se non c'è ancora nessun periodo) fino al mese scorso —
+        un punto di partenza ragionevole che l'utente può restringere se
+        la tariffa precedente valeva solo per l'ultimo mese chiuso."""
+        errors: dict[str, str] = {}
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+        mesi = (coordinator.data or {}).get("mesi", []) if coordinator else []
+        now = datetime.now()
+        current_month_key = f"{now.year}-{now.month:02d}"
+        closed_months = sorted(m["mese"] for m in mesi if m["mese"] != current_month_key)
+
+        if user_input is not None:
+            month_from = user_input.get("month_from", "").strip()
+            month_to = user_input.get("month_to", "").strip()
+            valid_format = all(
+                len(v) == 7 and v[4] == "-" and v[:4].isdigit() and v[5:].isdigit()
+                for v in (month_from, month_to)
+            )
+            if not valid_format:
+                errors["base"] = "invalid_month_format"
+            else:
+                store = (
+                    coordinator.frozen_tariffs
+                    if coordinator
+                    else FrozenTariffStore(self.hass, self._config_entry.entry_id)
+                )
+                await store.async_add_period(
+                    month_from, month_to, self._pending_old_tariff
+                )
+                return await self._async_finish_save()
+
+        default_to = closed_months[-1] if closed_months else current_month_key
+        default_from = closed_months[0] if closed_months else current_month_key
+        schema = vol.Schema(
+            {
+                vol.Required("month_from", default=default_from): str,
+                vol.Required("month_to", default=default_to): str,
+            }
+        )
+        return self.async_show_form(
+            step_id="tariff_period",
+            data_schema=schema,
+            errors=errors,
+        )
 
     async def async_step_energy_sensors(
         self, user_input: dict[str, Any] | None = None

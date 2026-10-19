@@ -136,12 +136,21 @@
         "data": {
           "name": "Load name"
         }
+      },
+      "tariff_period": {
+        "title": "Previous tariff period",
+        "description": "You changed the tariff. Indicate from which to which month the one just replaced was in effect (YYYY-MM format, e.g. 2026-06): months in this range will use that tariff instead of the new one, even in the future. If the previous tariff only applied to the last closed month, set the same month in both fields.",
+        "data": {
+          "month_from": "Start month (YYYY-MM)",
+          "month_to": "End month (YYYY-MM)"
+        }
       }
     },
     "error": {
       "no_energy_sensors": "Select at least one energy sensor.",
       "unmatched_power_sensors": "Some devices don't have a matched power sensor. Check the box to proceed anyway, or review your energy sensor selection.",
       "duplicate_entity": "This sensor has already been added to this list.",
+      "invalid_month_format": "Invalid format: use YYYY-MM, e.g. 2026-06.",
       "line_items_required": "{error_detail}",
       "line_items_invalid": "The text isn't valid: {error_detail}",
       "cost_mismatch": "{error_detail}",

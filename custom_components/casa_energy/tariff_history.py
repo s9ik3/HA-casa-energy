@@ -1,13 +1,23 @@
-"""Gestione delle tariffe "congelate" sui mesi già chiusi.
+"""Gestione dello storico delle tariffe per periodo.
 
-Quando l'utente modifica la tariffa dalle Opzioni, i mesi già passati non
-devono ricalcolare il loro costo con i nuovi parametri: la bolletta di
-gennaio non cambia se a marzo aggiorno il prezzo del kWh. Per ottenere
-questo, ogni volta che la tariffa cambia "congeliamo" (salviamo) la
-tariffa PRECEDENTE su tutti i mesi già chiusi che non hanno ancora una
-tariffa congelata propria. Il mese in corso non viene mai congelato in
-questo momento: lo sarà solo alla PROSSIMA modifica di tariffa, quando
-sarà a sua volta un mese passato.
+Le componenti della tariffa elettrica italiana (Cdispd, oneri di sistema
+ARIM/ASOS, ecc.) cambiano periodicamente, non solo quando l'utente decide
+di aggiornarle: ogni bolletta può avere coefficienti diversi da quella
+precedente. Per questo la tariffa attiva in configurazione (quella
+"corrente") NON deve mai retroagire sui mesi già chiusi — ma un singolo
+blob "congelato" per tutto il passato non basta, perché ogni mese chiuso
+può aver avuto una tariffa diversa dagli altri (es. giugno con una
+tariffa, luglio con un'altra, entrambi già chiusi rispetto ad agosto).
+
+Lo storico è quindi una lista di PERIODI, ciascuno con un mese iniziale,
+un mese finale, e la tariffa in vigore in quel periodo. Quando l'utente
+salva una tariffa diversa da quella attualmente attiva, gli si chiede
+esplicitamente a quale periodo appartenesse la tariffa appena sostituita
+(es. "giugno 2026 - giugno 2026"), e quel periodo viene aggiunto allo
+storico. Il coordinator, per ogni mese, cerca nello storico il periodo
+che lo contiene; se non lo trova in nessun periodo, usa la tariffa
+corrente (comportamento per il mese in corso e per mesi non ancora
+coperti da nessun periodo storico).
 
 I dati sono persistiti tramite lo Store di Home Assistant (non dentro
 ConfigEntry.data, che è pensato per configurazione utente, non per dati
@@ -34,61 +44,77 @@ from .const import (
     LINE_ITEM_TYPE_PER_KWH,
 )
 
-_STORAGE_VERSION = 1
+_STORAGE_VERSION = 2
 _STORAGE_KEY_PREFIX = "casa_energy_frozen_tariffs"
 
 
+def _month_key_to_ordinal(month_key: str) -> int:
+    """Converte 'YYYY-MM' in un intero ordinabile (anno*12+mese), per
+    confrontare facilmente se un mese cade dentro un range."""
+    year, month = month_key.split("-")
+    return int(year) * 12 + int(month)
+
+
 class FrozenTariffStore:
-    """Wrapper sopra homeassistant.helpers.storage.Store per le tariffe
-    congelate di una singola config entry."""
+    """Wrapper sopra homeassistant.helpers.storage.Store per lo storico
+    delle tariffe per periodo di una singola config entry."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
         self._store: Store = Store(
             hass, _STORAGE_VERSION, f"{_STORAGE_KEY_PREFIX}_{entry_id}"
         )
-        self._data: dict[str, dict] | None = None
+        self._periods: list[dict] | None = None
 
-    async def async_load(self) -> dict[str, dict]:
-        """Carica (con cache in memoria) le tariffe congelate: mappa
-        mese ("YYYY-MM") -> {price_per_kwh, fixed_monthly_cost,
-        extra_charges_per_kwh, vat_rate}."""
-        if self._data is None:
+    async def async_load(self) -> list[dict]:
+        """Carica (con cache in memoria) lo storico dei periodi: ciascuno
+        con month_from, month_to, tariff."""
+        if self._periods is None:
             stored = await self._store.async_load()
-            self._data = stored.get("months", {}) if stored else {}
-        return self._data
+            self._periods = stored.get("periods", []) if stored else []
+        return self._periods
 
-    async def async_freeze_previous_tariff(
-        self,
-        closed_months: list[str],
-        previous_tariff: dict,
+    async def async_add_period(
+        self, month_from: str, month_to: str, tariff: dict
     ) -> None:
-        """Congela previous_tariff su tutti i mesi in closed_months che
-        non hanno ancora una tariffa congelata propria. Chiamata quando
-        l'utente cambia la tariffa: previous_tariff è quella appena
-        sostituita (non quella nuova), perché è quella sotto cui i mesi
-        passati sono realmente stati fatturati."""
-        data = await self.async_load()
-        changed = False
-        for month_key in closed_months:
-            if month_key not in data:
-                data[month_key] = dict(previous_tariff)
-                changed = True
-        if changed:
-            await self._store.async_save({"months": data})
+        """Aggiunge un nuovo periodo storico con la tariffa indicata,
+        esplicitamente delimitato da month_from a month_to (entrambi
+        'YYYY-MM'). Non deduplica né unisce automaticamente con periodi
+        esistenti: la responsabilità di indicare il periodo corretto è
+        dell'utente, tramite lo step apposito nel config_flow."""
+        periods = await self.async_load()
+        periods.append(
+            {
+                "month_from": month_from,
+                "month_to": month_to,
+                "tariff": tariff,
+            }
+        )
+        await self._store.async_save({"periods": periods})
 
     async def async_reset(self) -> None:
-        """Rimuove tutte le tariffe congelate: i mesi passati torneranno
-        a essere ricalcolati con la tariffa corrente, finché non si
-        congela di nuovo qualcosa con una futura modifica di tariffa."""
-        self._data = {}
-        await self._store.async_save({"months": {}})
+        """Rimuove tutto lo storico dei periodi: ogni mese passato
+        tornerà a essere ricalcolato con la tariffa corrente, finché non
+        si aggiungono di nuovo periodi storici con future modifiche di
+        tariffa."""
+        self._periods = []
+        await self._store.async_save({"periods": []})
 
     def get_frozen_tariff(self, month_key: str) -> dict | None:
         """Versione sincrona per l'uso nel coordinator, dopo che
-        async_load è già stato chiamato almeno una volta."""
-        if self._data is None:
+        async_load è già stato chiamato almeno una volta. Cerca il primo
+        periodo storico che contiene month_key; se più periodi si
+        sovrappongono (non dovrebbe succedere se l'utente li inserisce
+        correttamente, ma non lo impediamo), vince il più recentemente
+        aggiunto (l'ultimo della lista)."""
+        if self._periods is None:
             return None
-        return self._data.get(month_key)
+        month_ord = _month_key_to_ordinal(month_key)
+        for period in reversed(self._periods):
+            from_ord = _month_key_to_ordinal(period["month_from"])
+            to_ord = _month_key_to_ordinal(period["month_to"])
+            if from_ord <= month_ord <= to_ord:
+                return period["tariff"]
+        return None
 
 
 def tariff_from_entry_data(data: dict) -> dict:
