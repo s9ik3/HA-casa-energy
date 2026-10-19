@@ -55,12 +55,19 @@ def _month_key_to_ordinal(month_key: str) -> int:
     return int(year) * 12 + int(month)
 
 
+class _MigratingStore(Store):
+    """Store che scarta i vecchi formati (v1: {"months": ...})."""
+
+    async def _async_migrate_func(self, old_major_version, old_minor_version, old_data):
+        return {"periods": []}
+
+
 class FrozenTariffStore:
     """Wrapper sopra homeassistant.helpers.storage.Store per lo storico
     delle tariffe per periodo di una singola config entry."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str) -> None:
-        self._store: Store = Store(
+        self._store: Store = _MigratingStore(
             hass, _STORAGE_VERSION, f"{_STORAGE_KEY_PREFIX}_{entry_id}"
         )
         self._periods: list[dict] | None = None
